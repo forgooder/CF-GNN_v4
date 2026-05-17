@@ -1,0 +1,19 @@
+.DS_Store
+__pycache__/
+tmp.txt
+experiments/
+data/*/subgraphs*/
+data/*/test_subgraphs*/
+data/*/*_predictions.txt
+data/*/grail_*_predictions.txt
+data/*/grail_neg_*_predictions.txt
+data/*/ranking_head.txt
+data/*/ranking_tail.txt
+
+#Saved and downloaded data files
+*.nt.gz
+*.npz
+*.pkl
+*.ipynb
+*.npy
+*.pyc
