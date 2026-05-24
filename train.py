@@ -107,12 +107,26 @@ if __name__ == '__main__':
                         help="Weight for causal score margin ranking loss when causal training is enabled")
     parser.add_argument("--effect_loss_weight", type=float, default=1.0,
                         help="Weight for causal effect margin ranking loss when causal training is enabled")
+    parser.add_argument("--effect_loss_warmup_epochs", type=int, default=0,
+                        help="Number of initial epochs with effect loss disabled during causal training")
     parser.add_argument("--shortcut_penalty_weight", type=float, default=0.0,
                         help="Optional penalty that discourages shortcut scores from separating positive and negative samples")
     parser.add_argument("--mask_sparsity_weight", type=float, default=0.0,
-                        help="Optional sparsity penalty on causal edge masks")
+                        help="Backward-compatible optional sparsity penalty on raw causal edge masks")
     parser.add_argument("--mask_entropy_weight", type=float, default=0.0,
-                        help="Optional entropy penalty on causal edge masks")
+                        help="Backward-compatible optional entropy penalty on raw causal edge masks")
+    parser.add_argument("--mask_gamma", type=float, default=1.0,
+                        help="Residual mask strength: effective_mask = 1 - gamma + gamma * raw_mask")
+    parser.add_argument("--mask_budget_weight", type=float, default=0.0,
+                        help="Weight for causal/shortcut raw mask target-ratio budget loss")
+    parser.add_argument("--mask_overlap_weight", type=float, default=0.0,
+                        help="Weight for raw causal-shortcut mask overlap penalty")
+    parser.add_argument("--causal_mask_target", type=float, default=0.5,
+                        help="Default target ratio for raw causal masks in budget loss")
+    parser.add_argument("--shortcut_mask_target", type=float, default=0.5,
+                        help="Default target ratio for raw shortcut masks in budget loss")
+    parser.add_argument("--relation_budget_path", type=str, default='',
+                        help="Optional JSON file with relation-aware causal/shortcut mask target ratios")
     parser.add_argument("--score_mode", type=str, choices=SCORE_MODE_CHOICES, default='original',
                         help="Score used for validation and training AUC logging")
 

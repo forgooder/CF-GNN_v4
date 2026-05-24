@@ -48,7 +48,11 @@ class GraphClassifier(nn.Module):
         return output
 
     def _get_causal_mask_generator(self, device):
-        if not hasattr(self, 'causal_mask_generator'):
+        if (
+            not hasattr(self, 'causal_mask_generator')
+            or not hasattr(self.causal_mask_generator, 'shared_mlp')
+            or not hasattr(self.causal_mask_generator, 'shortcut_head')
+        ):
             self.causal_mask_generator = CausalMaskGenerator(self.params).to(device=device)
         return self.causal_mask_generator
 
@@ -62,18 +66,32 @@ class GraphClassifier(nn.Module):
             raise ValueError("edge_mask can only be passed directly when mode='original'")
 
         causal_mask_generator = self._get_causal_mask_generator(g.ndata['feat'].device)
-        causal_edge_mask, shortcut_edge_mask = causal_mask_generator(g, rel_labels)
+        mask_outputs = causal_mask_generator(g, rel_labels)
+        causal_edge_mask = mask_outputs['causal_edge_mask']
+        shortcut_edge_mask = mask_outputs['shortcut_edge_mask']
 
         if mode == 'causal':
             output = self._score(g, rel_labels, edge_mask=causal_edge_mask)
             if return_masks:
-                return {'causal': output, 'causal_mask': causal_edge_mask}
+                return {
+                    'causal': output,
+                    'causal_mask': causal_edge_mask,
+                    'causal_raw_mask': mask_outputs['causal_raw_mask'],
+                    'causal_logits': mask_outputs['causal_logits'],
+                    'mask_stats': mask_outputs['mask_stats']
+                }
             return output
 
         if mode == 'shortcut':
             output = self._score(g, rel_labels, edge_mask=shortcut_edge_mask)
             if return_masks:
-                return {'shortcut': output, 'shortcut_mask': shortcut_edge_mask}
+                return {
+                    'shortcut': output,
+                    'shortcut_mask': shortcut_edge_mask,
+                    'shortcut_raw_mask': mask_outputs['shortcut_raw_mask'],
+                    'shortcut_logits': mask_outputs['shortcut_logits'],
+                    'mask_stats': mask_outputs['mask_stats']
+                }
             return output
 
         if mode == 'all':
@@ -86,7 +104,13 @@ class GraphClassifier(nn.Module):
                 'shortcut': score_shortcut,
                 'effect': score_causal - score_shortcut,
                 'causal_mask': causal_edge_mask,
-                'shortcut_mask': shortcut_edge_mask
+                'shortcut_mask': shortcut_edge_mask,
+                'causal_raw_mask': mask_outputs['causal_raw_mask'],
+                'shortcut_raw_mask': mask_outputs['shortcut_raw_mask'],
+                'causal_logits': mask_outputs['causal_logits'],
+                'shortcut_logits': mask_outputs['shortcut_logits'],
+                'target_rel_labels': mask_outputs['target_rel_labels'],
+                'mask_stats': mask_outputs['mask_stats']
             }
 
         raise ValueError(f"Unknown graph classifier mode: {mode}")

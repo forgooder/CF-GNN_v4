@@ -5,6 +5,7 @@ import logging
 import pdb
 import numpy as np
 import time
+import json
 
 import torch
 import torch.nn as nn
@@ -24,9 +25,11 @@ class Trainer():
         self.train_data = train
 
         self.updates_counter = 0
+        self.current_epoch = 0
         self.use_causal_training = getattr(params, 'use_causal_training', False)
         if self.use_causal_training and hasattr(self.graph_classifier, '_get_causal_mask_generator'):
             self.graph_classifier._get_causal_mask_generator(params.device)
+        self.relation_budget = self.load_relation_budget()
 
         model_params = list(self.graph_classifier.parameters())
         logging.info('Total number of parameters: %d' % sum(map(lambda x: x.numel(), model_params)))
@@ -45,25 +48,100 @@ class Trainer():
         self.last_metric = 0
         self.not_improved_count = 0
 
+    def load_relation_budget(self):
+        relation_budget_path = getattr(self.params, 'relation_budget_path', '')
+        if not relation_budget_path:
+            return {'causal': {}, 'shortcut': {}}
+
+        with open(relation_budget_path) as f:
+            raw_budget = json.load(f)
+
+        relation2id = getattr(self.graph_classifier, 'relation2id', {})
+
+        def normalize_budget(section):
+            budget = {}
+            for key, value in raw_budget.get(section, {}).items():
+                if key in relation2id:
+                    rel_id = relation2id[key]
+                else:
+                    rel_id = int(key)
+                budget[int(rel_id)] = float(value)
+            return budget
+
+        return {
+            'causal': normalize_budget('causal'),
+            'shortcut': normalize_budget('shortcut')
+        }
+
     def ranking_loss(self, score_pos, score_neg):
         score_pos = score_pos.view(-1)
         score_neg = score_neg.view(len(score_pos), -1).mean(dim=1)
         target = torch.ones_like(score_pos, device=self.params.device)
         return self.criterion(score_pos, score_neg, target)
 
+    def mask_targets(self, target_rel_labels, default_target, budget_map):
+        targets = torch.full_like(target_rel_labels.float(), float(default_target), device=self.params.device)
+        for rel_id, target in budget_map.items():
+            targets = torch.where(
+                target_rel_labels == int(rel_id),
+                torch.full_like(targets, float(target)),
+                targets
+            )
+        return targets
+
     def mask_regularization(self, outputs_pos, outputs_neg):
         mask_sparsity_weight = getattr(self.params, 'mask_sparsity_weight', 0.0)
         mask_entropy_weight = getattr(self.params, 'mask_entropy_weight', 0.0)
+        mask_budget_weight = getattr(self.params, 'mask_budget_weight', 0.0)
+        mask_overlap_weight = getattr(self.params, 'mask_overlap_weight', 0.0)
 
-        masks = torch.cat([
-            outputs_pos['causal_mask'].view(-1),
-            outputs_neg['causal_mask'].view(-1)
+        causal_masks = torch.cat([
+            outputs_pos['causal_raw_mask'].view(-1),
+            outputs_neg['causal_raw_mask'].view(-1)
         ])
-        sparsity = masks.mean()
+        shortcut_masks = torch.cat([
+            outputs_pos['shortcut_raw_mask'].view(-1),
+            outputs_neg['shortcut_raw_mask'].view(-1)
+        ])
+        target_rel_labels = torch.cat([
+            outputs_pos['target_rel_labels'].view(-1),
+            outputs_neg['target_rel_labels'].view(-1)
+        ]).to(device=self.params.device)
+
+        causal_targets = self.mask_targets(
+            target_rel_labels,
+            getattr(self.params, 'causal_mask_target', 0.5),
+            self.relation_budget['causal']
+        )
+        shortcut_targets = self.mask_targets(
+            target_rel_labels,
+            getattr(self.params, 'shortcut_mask_target', 0.5),
+            self.relation_budget['shortcut']
+        )
+
+        causal_sparsity = causal_masks.mean()
+        shortcut_sparsity = shortcut_masks.mean()
         eps = 1e-8
-        entropy = -(masks * torch.log(masks + eps) + (1 - masks) * torch.log(1 - masks + eps)).mean()
-        reg_loss = mask_sparsity_weight * sparsity + mask_entropy_weight * entropy
-        return reg_loss, sparsity.item(), entropy.item()
+        causal_entropy = -(causal_masks * torch.log(causal_masks + eps) + (1 - causal_masks) * torch.log(1 - causal_masks + eps)).mean()
+        shortcut_entropy = -(shortcut_masks * torch.log(shortcut_masks + eps) + (1 - shortcut_masks) * torch.log(1 - shortcut_masks + eps)).mean()
+        budget_loss = (
+            F.mse_loss(causal_masks, causal_targets)
+            + F.mse_loss(shortcut_masks, shortcut_targets)
+        )
+        overlap_loss = (causal_masks * shortcut_masks).mean()
+        legacy_reg = mask_sparsity_weight * causal_sparsity + mask_entropy_weight * causal_entropy
+        reg_loss = legacy_reg + mask_budget_weight * budget_loss + mask_overlap_weight * overlap_loss
+
+        stats = {
+            'mask_reg_loss': reg_loss.item(),
+            'causal_mask_raw_mean': causal_sparsity.item(),
+            'shortcut_mask_raw_mean': shortcut_sparsity.item(),
+            'causal_mask_entropy': causal_entropy.item(),
+            'shortcut_mask_entropy': shortcut_entropy.item(),
+            'mask_budget_loss': budget_loss.item(),
+            'mask_overlap_loss': overlap_loss.item()
+        }
+        return reg_loss, stats
 
     def shortcut_penalty(self, outputs_pos, outputs_neg):
         shortcut_penalty_weight = getattr(self.params, 'shortcut_penalty_weight', 0.0)
@@ -81,13 +159,15 @@ class Trainer():
         original_loss = self.ranking_loss(outputs_pos['original'], outputs_neg['original'])
         causal_loss = self.ranking_loss(outputs_pos['causal'], outputs_neg['causal'])
         effect_loss = self.ranking_loss(outputs_pos['effect'], outputs_neg['effect'])
-        mask_reg_loss, mask_sparsity, mask_entropy = self.mask_regularization(outputs_pos, outputs_neg)
+        mask_reg_loss, mask_stats = self.mask_regularization(outputs_pos, outputs_neg)
         shortcut_loss = self.shortcut_penalty(outputs_pos, outputs_neg)
+        effect_warmup_epochs = getattr(self.params, 'effect_loss_warmup_epochs', 0)
+        effect_loss_weight = 0.0 if self.current_epoch <= effect_warmup_epochs else getattr(self.params, 'effect_loss_weight', 1.0)
 
         total_loss = (
             original_loss
             + getattr(self.params, 'causal_loss_weight', 1.0) * causal_loss
-            + getattr(self.params, 'effect_loss_weight', 1.0) * effect_loss
+            + effect_loss_weight * effect_loss
             + mask_reg_loss
             + shortcut_loss
         )
@@ -100,6 +180,7 @@ class Trainer():
             'original_loss': original_loss.item(),
             'causal_loss': causal_loss.item(),
             'effect_loss': effect_loss.item(),
+            'effect_loss_weight': effect_loss_weight,
             'mask_reg_loss': mask_reg_loss.item(),
             'shortcut_penalty': shortcut_loss.item(),
             'total_loss': total_loss.item(),
@@ -109,9 +190,11 @@ class Trainer():
             'effect_score_mean': outputs_pos['effect'].mean().item(),
             'causal_mask_mean': outputs_pos['causal_mask'].mean().item(),
             'shortcut_mask_mean': outputs_pos['shortcut_mask'].mean().item(),
-            'mask_sparsity': mask_sparsity,
-            'mask_entropy': mask_entropy
+            'causal_mask_raw_mean': outputs_pos['causal_raw_mask'].mean().item(),
+            'shortcut_mask_raw_mean': outputs_pos['shortcut_raw_mask'].mean().item(),
+            'mask_overlap': outputs_pos['mask_stats']['overlap'].item()
         }
+        stats.update(mask_stats)
         return total_loss, score_pos, score_neg, stats
 
     def aggregate_stats(self, stats):
@@ -179,6 +262,7 @@ class Trainer():
         self.reset_training_state()
 
         for epoch in range(1, self.params.num_epochs + 1):
+            self.current_epoch = epoch
             time_start = time.time()
             loss, auc, auc_pr, weight_norm, stats = self.train_epoch()
             time_elapsed = time.time() - time_start

@@ -1,6 +1,6 @@
-# Causal-GraIL v4
+# Causal-GraIL v5
 
-This repository keeps the original GraIL baseline for inductive relation prediction and adds an optional Causal-GraIL path. The causal path is disabled by default, so the original GraIL training and evaluation commands remain valid.
+This repository keeps the original GraIL baseline for inductive relation prediction and adds optional Causal-GraIL paths. The causal path is disabled by default, so the original GraIL training and evaluation commands remain valid.
 
 The implementation is based on the GraIL algorithm described in the ICML'20 paper [Inductive relation prediction by subgraph reasoning](https://arxiv.org/abs/1911.06962).
 
@@ -22,19 +22,53 @@ To test GraIL run the following commands.
 
 The trained model and the logs are stored in `experiments` folder. Note that to ensure a fair comparison, we test all models on the same negative triplets. In order to do that in the current setup, we store the sampled negative triplets while evaluating GraIL and use these later to evaluate other baseline models.
 
-### Causal-GraIL
-Causal-GraIL adds three opt-in components:
+### Causal-GraIL v5
+Causal-GraIL adds opt-in components:
 - optional edge masks in the DGL R-GCN message passing path;
-- a `CausalMaskGenerator` that can produce original, causal, shortcut, and causal-effect scores;
+- an alpha/beta two-head `CausalMaskGenerator` that can produce original, causal, shortcut, and causal-effect scores;
 - causal ranking losses and selectable validation/test score modes.
+
+In v5, shortcut masks are no longer defined as `1 - causal_mask`. The generator learns two independent raw masks:
+
+`causal_mask = sigmoid(causal_logits)`
+
+`shortcut_mask = sigmoid(shortcut_logits)`
+
+The masks injected into R-GCN use a residual gate:
+
+`effective_mask = 1 - gamma + gamma * raw_mask`
+
+where `--mask_gamma` defaults to `1.0`. Smaller values keep more of the original graph signal.
 
 The default configuration does not enable causal training. To run a small causal smoke training job:
 
 `python train.py -d WN18RR_v1 -e causal_grail_wn_v1_smoke --use_causal_training --num_epochs 1 --score_mode original`
 
-To train with causal losses:
+To train with causal losses and v5 budget/overlap regularization:
 
-`python train.py -d WN18RR_v1 -e causal_grail_wn_v1 --use_causal_training --causal_loss_weight 1.0 --effect_loss_weight 1.0 --mask_sparsity_weight 0.001 --mask_entropy_weight 0.001 --score_mode original`
+`python train.py -d WN18RR_v1 -e causal_grail_wn_v1_v5 --use_causal_training --causal_loss_weight 1.0 --effect_loss_weight 0.1 --effect_loss_warmup_epochs 5 --mask_gamma 0.7 --mask_budget_weight 0.01 --mask_overlap_weight 0.01 --causal_mask_target 0.5 --shortcut_mask_target 0.3 --score_mode original`
+
+The v4 sparsity/entropy parameters are still accepted for compatibility, but v5 primarily targets mask collapse with budget and overlap terms:
+- `--mask_budget_weight`
+- `--mask_overlap_weight`
+- `--causal_mask_target`
+- `--shortcut_mask_target`
+- `--relation_budget_path`
+
+`--relation_budget_path` can point to a JSON file with relation-aware target ratios. Keys may be relation ids or relation names:
+
+```
+{
+  "causal": {
+    "0": 0.5,
+    "_hypernym": 0.4
+  },
+  "shortcut": {
+    "0": 0.3,
+    "_hypernym": 0.25
+  }
+}
+```
 
 Available score modes for validation and testing are:
 - `original`: original GraIL score.
@@ -44,19 +78,19 @@ Available score modes for validation and testing are:
 
 AUC/AUC-PR examples:
 
-`python test_auc.py -d WN18RR_v1_ind -e causal_grail_wn_v1 --score_mode original`
+`python test_auc.py -d WN18RR_v1_ind -e causal_grail_wn_v1_v5 --score_mode original`
 
-`python test_auc.py -d WN18RR_v1_ind -e causal_grail_wn_v1 --score_mode causal`
+`python test_auc.py -d WN18RR_v1_ind -e causal_grail_wn_v1_v5 --score_mode causal`
 
-`python test_auc.py -d WN18RR_v1_ind -e causal_grail_wn_v1 --score_mode effect`
+`python test_auc.py -d WN18RR_v1_ind -e causal_grail_wn_v1_v5 --score_mode effect`
 
 Ranking examples:
 
-`python test_ranking.py -d WN18RR_v1_ind -e causal_grail_wn_v1 --score_mode original`
+`python test_ranking.py -d WN18RR_v1_ind -e causal_grail_wn_v1_v5 --score_mode original`
 
-`python test_ranking.py -d WN18RR_v1_ind -e causal_grail_wn_v1 --score_mode causal`
+`python test_ranking.py -d WN18RR_v1_ind -e causal_grail_wn_v1_v5 --score_mode causal`
 
-`python test_ranking.py -d WN18RR_v1_ind -e causal_grail_wn_v1 --score_mode effect`
+`python test_ranking.py -d WN18RR_v1_ind -e causal_grail_wn_v1_v5 --score_mode effect`
 
 No metric improvement is claimed by this repository. Run the experiments on your target server and report results using the unchanged AUC, AUC-PR, and Hits@10 evaluation logic.
 
