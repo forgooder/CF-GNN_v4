@@ -17,3 +17,8 @@ data/*/ranking_tail.txt
 *.ipynb
 *.npy
 *.pyc
+*.pth
+*.log
+*.mdb
+*.lock
+data/
