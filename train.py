@@ -129,6 +129,10 @@ if __name__ == '__main__':
                         help="Minimum desired entropy for raw causal and shortcut masks")
     parser.add_argument("--mask_logit_l2_weight", type=float, default=0.0,
                         help="Weight for L2 penalty on causal/shortcut mask logits to discourage saturation")
+    parser.add_argument("--causal_mask_entropy_floor_weight", type=float, default=0.0,
+                        help="Optional extra entropy-floor weight for causal alpha masks only")
+    parser.add_argument("--causal_mask_logit_l2_weight", type=float, default=0.0,
+                        help="Optional extra L2 penalty weight for causal alpha mask logits only")
     parser.add_argument("--mask_gamma", type=float, default=1.0,
                         help="Residual mask strength: effective_mask = 1 - gamma + gamma * raw_mask")
     parser.add_argument("--mask_budget_weight", type=float, default=0.0,

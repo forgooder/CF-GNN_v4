@@ -2573,3 +2573,71 @@ Next action:
 ```text
 Do not run test evaluation. NELL_v1 now shows that shared budget/target tuning is insufficient for alpha collapse. The next useful change is an alpha-specific default-off control, such as separate alpha entropy floor/logit L2 weights, or a staged/frozen mask schedule.
 ```
+
+## 42. Alpha-Specific Regularizer Patch and Smoke
+
+Code change:
+
+```text
+Added default-off alpha-specific regularizer controls:
+--causal_mask_entropy_floor_weight
+--causal_mask_logit_l2_weight
+```
+
+These add extra terms on top of the existing shared mask regularizers only when explicitly enabled. Default values are 0.0, so the original GRAIL path and existing v5 configurations remain unchanged unless the new flags are passed.
+
+Smoke run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d nell_v1 -e smoke_v5_nell_v1_alpha_specific_regs \
+  --use_causal_training \
+  --num_epochs 1 \
+  --batch_size 4 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 \
+  --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run.
+
+Smoke validation:
+
+```text
+best validation AUC 0.8878
+best validation AUC-PR 0.8997
+```
+
+Epoch 1 stats:
+
+```text
+raw causal=0.5751
+raw shortcut=0.4222
+entropy causal=0.3430
+entropy shortcut=0.6780
+mask_reg_loss=0.0518
+mask_entropy_floor_loss=0.00138
+mask_logit_l2_loss=13.9907
+causal_mask_entropy_floor_loss=0.00138
+causal_mask_logit_l2_loss=13.8667
+```
+
+Conclusion:
+
+```text
+Code smoke passed. The parser accepts the new alpha-specific flags, training completes, and the new causal_mask_entropy_floor_loss / causal_mask_logit_l2_loss diagnostics are logged. This is not a performance result.
+```
+
+Next action:
+
+```text
+Run a longer validation-only NELL_v1 diagnostic with alpha-specific regularization. The immediate target is mask health, not test-set performance: alpha entropy should remain materially above the 0.1-0.12 failure band while beta remains healthy.
+```

@@ -95,6 +95,8 @@ class Trainer():
         mask_entropy_floor_weight = getattr(self.params, 'mask_entropy_floor_weight', 0.0)
         mask_entropy_floor = getattr(self.params, 'mask_entropy_floor', 0.1)
         mask_logit_l2_weight = getattr(self.params, 'mask_logit_l2_weight', 0.0)
+        causal_entropy_floor_weight = getattr(self.params, 'causal_mask_entropy_floor_weight', 0.0)
+        causal_logit_l2_weight = getattr(self.params, 'causal_mask_logit_l2_weight', 0.0)
         mask_budget_weight = getattr(self.params, 'mask_budget_weight', 0.0)
         mask_overlap_weight = getattr(self.params, 'mask_overlap_weight', 0.0)
 
@@ -145,7 +147,9 @@ class Trainer():
             torch.relu(entropy_floor - causal_entropy).pow(2)
             + torch.relu(entropy_floor - shortcut_entropy).pow(2)
         )
+        causal_entropy_floor_loss = torch.relu(entropy_floor - causal_entropy).pow(2)
         logit_l2_loss = causal_logits.pow(2).mean() + shortcut_logits.pow(2).mean()
+        causal_logit_l2_loss = causal_logits.pow(2).mean()
         legacy_reg = mask_sparsity_weight * causal_sparsity + mask_entropy_weight * causal_entropy
         reg_loss = (
             legacy_reg
@@ -153,6 +157,8 @@ class Trainer():
             + mask_overlap_weight * overlap_loss
             + mask_entropy_floor_weight * entropy_floor_loss
             + mask_logit_l2_weight * logit_l2_loss
+            + causal_entropy_floor_weight * causal_entropy_floor_loss
+            + causal_logit_l2_weight * causal_logit_l2_loss
         )
 
         stats = {
@@ -164,7 +170,9 @@ class Trainer():
             'mask_budget_loss': budget_loss.item(),
             'mask_overlap_loss': overlap_loss.item(),
             'mask_entropy_floor_loss': entropy_floor_loss.item(),
-            'mask_logit_l2_loss': logit_l2_loss.item()
+            'mask_logit_l2_loss': logit_l2_loss.item(),
+            'causal_mask_entropy_floor_loss': causal_entropy_floor_loss.item(),
+            'causal_mask_logit_l2_loss': causal_logit_l2_loss.item()
         }
         return reg_loss, stats
 
