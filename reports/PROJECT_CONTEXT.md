@@ -1846,3 +1846,88 @@ Next action:
 ```text
 Run a longer WN18RR_v4 validation/mask diagnostic with logit L2 before any test-set evaluation. Watch whether alpha remains healthy after effect loss turns on at epoch11.
 ```
+
+## 33. WN18RR_v4 Logit L2 12-Epoch Effect-Onset Diagnostic
+
+Completed `diag_v5_wn18rr_v4_logit_l2_12ep` on 2026-06-03 using commit `941d137`.
+
+Configuration:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v4 -e diag_v5_wn18rr_v4_logit_l2_12ep \
+  --use_causal_training \
+  --num_epochs 12 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC 0.9148
+best validation AUC-PR 0.9181
+```
+
+Warmup mask health:
+
+```text
+epoch2 raw causal=0.5228
+epoch2 raw shortcut=0.4263
+epoch2 entropy causal=0.4376
+epoch2 entropy shortcut=0.6808
+
+epoch7 raw causal=0.6930
+epoch7 raw shortcut=0.4143
+epoch7 entropy causal=0.5060
+epoch7 entropy shortcut=0.6778
+
+epoch10 raw causal=0.7654
+epoch10 raw shortcut=0.4085
+epoch10 entropy causal=0.3529
+epoch10 entropy shortcut=0.6753
+epoch10 budget_loss=0.1678
+epoch10 mask_logit_l2_loss=12.1773
+```
+
+Effect-loss onset:
+
+```text
+epoch11 effect_loss_weight=0.1
+epoch11 raw causal=0.8085
+epoch11 raw shortcut=0.3327
+epoch11 entropy causal=0.2238
+epoch11 entropy shortcut=0.1554
+epoch11 budget_loss=0.4063
+epoch11 mask_logit_l2_loss=57.6544
+
+epoch12 effect_loss_weight=0.1
+epoch12 raw causal=0.7400
+epoch12 raw shortcut=0.3400
+epoch12 entropy causal=0.1638
+epoch12 entropy shortcut=0.1189
+epoch12 budget_loss=0.4302
+epoch12 mask_logit_l2_loss=75.3816
+```
+
+Conclusion:
+
+```text
+Negative effect-onset diagnostic. Logit L2 materially mitigates WN18RR_v4 warmup alpha collapse, but it does not protect masks after effect loss turns on. Shortcut entropy collapses sharply at epoch11/12, alpha entropy also falls, budget loss rises, and validation AUC-PR remains only 0.9181.
+```
+
+Next action:
+
+```text
+Do not run test evaluation for this configuration. The next validation experiment should keep logit L2 but soften effect onset, either through effect_loss_ramp_epochs or a reduced/detached effect gradient path.
+```
