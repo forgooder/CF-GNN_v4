@@ -959,3 +959,60 @@ On which datasets is it ineffective?
 Does it truly mitigate v4 mask collapse?
 If not, what should the next version change?
 ```
+
+## 19. Latest WN18RR_v1 Entropy Floor Result
+
+Completed `causal_v5_wn18rr_v1_entropy_floor` on 2026-06-03 using commit `fc7d9f2`.
+
+Configuration:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e causal_v5_wn18rr_v1_entropy_floor \
+  --use_causal_training \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_entropy_floor_weight 0.05 \
+  --mask_entropy_floor 0.2 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+Test AUC/AUC-PR:
+
+```text
+original: 0.9213 / 0.9244
+causal: 0.9196 / 0.9233
+effect: 0.8228 / 0.8685
+causal_plus_effect: 0.9214 / 0.9228
+```
+
+Ranking with `original`:
+
+```text
+MRR 0.7103
+Hits@1 0.6638
+Hits@5 0.7641
+Hits@10 0.7735
+```
+
+Mask health:
+
+```text
+epoch100 raw causal=0.8879
+epoch100 raw shortcut=0.2967
+epoch100 entropy causal=0.0488
+epoch100 entropy shortcut=0.0464
+epoch95 raw causal=0.9998
+epoch95 entropy causal=0.0009
+```
+
+Conclusion:
+
+```text
+Negative diagnostic result. Entropy floor weight 0.05 is too weak and does not prevent alpha collapse. The best AUC-PR and Hits@10 remain below same-environment baseline. Do not repeat this exact configuration.
+```
