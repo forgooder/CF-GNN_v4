@@ -2714,3 +2714,81 @@ Next action:
 ```text
 Do not run test evaluation yet. This is the first promising NELL_v1 mask-health result, but it needs either a longer validation-only run or a repeated-seed/selection protocol before using test-set budget. If it remains stable, NELL_v1 becomes the best candidate for a formal v5 comparison.
 ```
+
+## 44. nell_v1 Alpha-Specific Regularizer 20 Epoch Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d nell_v1 -e diag_v5_nell_v1_alpha_specific_regs_20ep \
+  --use_causal_training \
+  --num_epochs 20 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 \
+  --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC 0.9127
+best observed validation AUC-PR 0.9219
+```
+
+Note: checkpoint selection remains validation AUC. The best validation AUC was epoch8 with AUC/AUC-PR 0.9127/0.9213. The best observed validation AUC-PR was epoch10 with AUC/AUC-PR 0.9099/0.9219.
+
+Mask checkpoints:
+
+```text
+epoch2 raw causal=0.5249
+epoch2 raw shortcut=0.4256
+epoch2 entropy causal=0.1847
+epoch2 entropy shortcut=0.6795
+
+epoch8 raw causal=0.5189
+epoch8 raw shortcut=0.4257
+epoch8 entropy causal=0.2665
+epoch8 entropy shortcut=0.6796
+
+epoch10 raw causal=0.6820
+epoch10 raw shortcut=0.4147
+epoch10 entropy causal=0.2322
+epoch10 entropy shortcut=0.6763
+
+epoch15 raw causal=0.5516
+epoch15 raw shortcut=0.4240
+epoch15 entropy causal=0.1982
+epoch15 entropy shortcut=0.6793
+
+epoch20 raw causal=0.5634
+epoch20 raw shortcut=0.4235
+epoch20 entropy causal=0.2657
+epoch20 entropy shortcut=0.6790
+epoch20 budget_loss=0.1758
+epoch20 overlap_loss=0.2274
+epoch20 causal_logit_l2_loss=21.9077
+```
+
+Conclusion:
+
+```text
+Mixed replication. Alpha-specific regularization still improves mask health relative to earlier NELL_v1 causal-only failures: beta remains healthy and alpha does not fall into the severe 0.1-0.12 entropy failure band for long. However, this 20 epoch repeat is weaker than the previous 10 epoch run. Validation AUC-PR peaks at 0.9219 instead of 0.9244, and alpha entropy occasionally approaches the 0.2 floor, for example epoch2 0.1847 and epoch15 0.1982.
+```
+
+Next action:
+
+```text
+Do not run test evaluation. Treat alpha-specific regularization as promising but not yet stable. The next useful NELL_v1 step is either a controlled repeat/seed protocol or a small alpha-specific weight sweep, for example stronger causal entropy/logit weights, before formal test evaluation.
+```
