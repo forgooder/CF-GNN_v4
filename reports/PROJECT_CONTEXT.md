@@ -2317,3 +2317,69 @@ Next action:
 ```text
 Do not run test evaluation for this configuration. WN18RR_v4 needs a structural training-stage change rather than another scalar tweak: stage/freeze scorer branches, freeze masks before effect onset, or disable effect loss for this dataset while evaluating whether logit L2 plus causal loss alone can produce stable masks.
 ```
+
+## 38. WN18RR_v4 Causal-Only Logit-L2 Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v4 -e diag_v5_wn18rr_v4_logit_l2_causal_only_20ep \
+  --use_causal_training \
+  --num_epochs 20 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC 0.9144
+best validation AUC-PR 0.9177
+```
+
+Mask and stability checkpoints:
+
+```text
+epoch10 raw causal=0.5275
+epoch10 raw shortcut=0.4263
+epoch10 entropy causal=0.5900
+epoch10 entropy shortcut=0.6817
+epoch10 budget_loss=0.0521
+epoch10 mask_logit_l2_loss=1.5207
+
+epoch14 raw causal=0.4955
+epoch14 raw shortcut=0.4275
+epoch14 entropy causal=0.4031
+epoch14 entropy shortcut=0.6811
+epoch14 mask_logit_l2_loss=7.2992
+
+epoch20 raw causal=0.5496
+epoch20 raw shortcut=0.4246
+epoch20 entropy causal=0.4654
+epoch20 entropy shortcut=0.6807
+epoch20 budget_loss=0.1031
+epoch20 mask_logit_l2_loss=5.5877
+epoch20 weight_norm=226.3302
+```
+
+Conclusion:
+
+```text
+Mixed diagnostic. Disabling effect loss prevents the WN18RR_v4 post-onset scorer explosion and keeps shortcut entropy healthy through 20 epochs. Alpha is much healthier than effect-loss variants but still occasionally drifts high, for example epoch19 raw causal=0.8127. Validation AUC-PR remains only 0.9177, so this run is not competitive enough for test evaluation.
+```
+
+Next action:
+
+```text
+Treat the effect objective as the main WN18RR_v4 instability source. The next v5 step should either introduce a safer staged effect objective, or move to the next priority dataset with logit-L2 diagnostics before spending more tuning budget on WN18RR_v4.
+```
