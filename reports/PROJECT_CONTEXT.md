@@ -2383,3 +2383,57 @@ Next action:
 ```text
 Treat the effect objective as the main WN18RR_v4 instability source. The next v5 step should either introduce a safer staged effect objective, or move to the next priority dataset with logit-L2 diagnostics before spending more tuning budget on WN18RR_v4.
 ```
+
+## 39. nell_v1 Logit-L2 Causal-Only Smoke
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d nell_v1 -e smoke_v5_nell_v1_logit_l2_causal_only \
+  --use_causal_training \
+  --num_epochs 1 \
+  --batch_size 4 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run. The run built the `nell_v1` train/valid subgraph cache and completed the 1 epoch smoke.
+
+Validation:
+
+```text
+best validation AUC 0.8957
+best validation AUC-PR 0.9018
+```
+
+Epoch 1 mask health:
+
+```text
+raw causal=0.4521
+raw shortcut=0.4307
+entropy causal=0.3080
+entropy shortcut=0.6798
+budget_loss=0.1506
+overlap_loss=0.1842
+mask_logit_l2_loss=17.8342
+weight_norm=163.0245
+```
+
+Conclusion:
+
+```text
+Positive path smoke. nell_v1 training, validation, causal scoring, and mask logging all work. Raw alpha/beta means are close to the 0.45 targets and shortcut entropy is healthy. Alpha entropy is lower than ideal at 0.3080 but does not show the hard raw collapse seen in WN18RR_v2/v4 effect-loss diagnostics.
+```
+
+Next action:
+
+```text
+Proceed to a longer validation-only nell_v1 diagnostic, still without test-set evaluation. Use the same logit-L2 causal-only setup first to establish whether the initially healthy mask state persists beyond the smoke epoch.
+```
