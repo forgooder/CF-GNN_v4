@@ -1648,3 +1648,67 @@ Next action:
 ```text
 Run a short WN18RR_v4 validation/mask diagnostic before any formal test evaluation. Because WN18RR_v2 scalar/schedule/clamp tuning failed and WN18RR_v4 alpha entropy is already low in smoke, monitor early alpha collapse rather than promoting directly to a full test-set run.
 ```
+
+## 30. WN18RR_v4 5-Epoch Mask Diagnostic
+
+Completed `diag_v5_wn18rr_v4_stronger_beta_5ep` on 2026-06-03 using commit `ab23146`.
+
+Configuration:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v4 -e diag_v5_wn18rr_v4_stronger_beta_5ep \
+  --use_causal_training \
+  --num_epochs 5 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC 0.9120
+best validation AUC-PR 0.9139
+```
+
+Mask health:
+
+```text
+epoch1 raw causal=0.4626
+epoch1 raw shortcut=0.4093
+epoch1 entropy causal=0.2114
+epoch1 entropy shortcut=0.6711
+epoch2 raw causal=0.0354
+epoch2 raw shortcut=0.4479
+epoch2 entropy causal=0.0329
+epoch2 entropy shortcut=0.6871
+epoch4 raw causal=0.9744
+epoch4 raw shortcut=0.3545
+epoch4 entropy causal=0.0306
+epoch4 entropy shortcut=0.6491
+epoch5 raw causal=0.9766
+epoch5 raw shortcut=0.3551
+epoch5 entropy causal=0.0246
+epoch5 entropy shortcut=0.6494
+```
+
+Conclusion:
+
+```text
+Negative diagnostic. WN18RR_v4 shows alpha collapse before effect loss is active. The causal mask first collapses near zero at epoch2, then saturates near one by epochs4-5, while shortcut remains comparatively healthy. This mirrors the WN18RR_v2 finding that alpha dynamics are the primary unresolved v5 problem.
+```
+
+Next action:
+
+```text
+Do not promote this WN18RR_v4 stronger-beta-budget setting to a test run. The next implementation should directly target alpha entropy/budget stability before effect loss and before longer formal runs.
+```
