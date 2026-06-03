@@ -1257,3 +1257,80 @@ Conclusion:
 ```text
 The new flag works and preserves the old default behavior. The smoke is not a performance result. Next diagnostic should use WN18RR_v2 with warmup=10 and ramp=10 to test whether gradual effect activation prevents the epoch11 beta collapse without producing high-overlap masks.
 ```
+
+## 24. WN18RR_v2 Effect Ramp Diagnostic
+
+Completed `diag_v5_wn18rr_v2_effect_ramp_15ep` on 2026-06-03 using commit `c72730d`.
+
+Configuration:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v2 -e diag_v5_wn18rr_v2_effect_ramp_15ep \
+  --use_causal_training \
+  --num_epochs 15 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --effect_loss_ramp_epochs 10 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC 0.9327
+best validation AUC-PR 0.9292
+```
+
+Mask health:
+
+```text
+epoch8 effect_loss_weight=0.0
+epoch8 raw causal=0.9527
+epoch8 raw shortcut=0.3577
+epoch8 entropy causal=0.0595
+epoch8 entropy shortcut=0.6508
+epoch10 effect_loss_weight=0.0
+epoch10 raw causal=0.0073
+epoch10 raw shortcut=0.4511
+epoch10 entropy causal=0.0146
+epoch10 entropy shortcut=0.6883
+epoch11 effect_loss_weight=0.01
+epoch11 ramp_factor=0.1
+epoch11 raw causal=0.4300
+epoch11 raw shortcut=0.0033
+epoch11 entropy causal=0.0282
+epoch11 entropy shortcut=0.0105
+epoch12 effect_loss_weight=0.02
+epoch12 raw causal=0.9883
+epoch12 raw shortcut=0.1407
+epoch12 entropy causal=0.0269
+epoch12 entropy shortcut=0.0893
+epoch15 effect_loss_weight=0.05
+epoch15 raw causal=0.9821
+epoch15 raw shortcut=0.3468
+epoch15 entropy causal=0.0265
+epoch15 entropy shortcut=0.0850
+epoch15 budget_loss=0.5054
+epoch15 overlap_loss=0.3329
+```
+
+Conclusion:
+
+```text
+Negative diagnostic. The ramp works mechanically but does not solve collapse. Alpha collapses during warmup before effect loss is active, then beta still approaches zero at the first ramp epoch. By epoch15, masks are low-entropy with high budget and overlap losses.
+```
+
+Next action:
+
+```text
+Stop scalar-only WN18RR_v2 tuning. The next code-level candidate should add staged mask regularization or detach/stop-gradient logic so alpha/beta masks do not chase each other through the effect objective. Additional full test evaluation is not justified from this diagnostic.
+```
