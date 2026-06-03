@@ -94,6 +94,7 @@ class Trainer():
         mask_entropy_weight = getattr(self.params, 'mask_entropy_weight', 0.0)
         mask_entropy_floor_weight = getattr(self.params, 'mask_entropy_floor_weight', 0.0)
         mask_entropy_floor = getattr(self.params, 'mask_entropy_floor', 0.1)
+        mask_logit_l2_weight = getattr(self.params, 'mask_logit_l2_weight', 0.0)
         mask_budget_weight = getattr(self.params, 'mask_budget_weight', 0.0)
         mask_overlap_weight = getattr(self.params, 'mask_overlap_weight', 0.0)
 
@@ -104,6 +105,14 @@ class Trainer():
         shortcut_masks = torch.cat([
             outputs_pos['shortcut_raw_mask'].view(-1),
             outputs_neg['shortcut_raw_mask'].view(-1)
+        ])
+        causal_logits = torch.cat([
+            outputs_pos['causal_logits'].view(-1),
+            outputs_neg['causal_logits'].view(-1)
+        ])
+        shortcut_logits = torch.cat([
+            outputs_pos['shortcut_logits'].view(-1),
+            outputs_neg['shortcut_logits'].view(-1)
         ])
         target_rel_labels = torch.cat([
             outputs_pos['target_rel_labels'].view(-1),
@@ -136,12 +145,14 @@ class Trainer():
             torch.relu(entropy_floor - causal_entropy).pow(2)
             + torch.relu(entropy_floor - shortcut_entropy).pow(2)
         )
+        logit_l2_loss = causal_logits.pow(2).mean() + shortcut_logits.pow(2).mean()
         legacy_reg = mask_sparsity_weight * causal_sparsity + mask_entropy_weight * causal_entropy
         reg_loss = (
             legacy_reg
             + mask_budget_weight * budget_loss
             + mask_overlap_weight * overlap_loss
             + mask_entropy_floor_weight * entropy_floor_loss
+            + mask_logit_l2_weight * logit_l2_loss
         )
 
         stats = {
@@ -152,7 +163,8 @@ class Trainer():
             'shortcut_mask_entropy': shortcut_entropy.item(),
             'mask_budget_loss': budget_loss.item(),
             'mask_overlap_loss': overlap_loss.item(),
-            'mask_entropy_floor_loss': entropy_floor_loss.item()
+            'mask_entropy_floor_loss': entropy_floor_loss.item(),
+            'mask_logit_l2_loss': logit_l2_loss.item()
         }
         return reg_loss, stats
 

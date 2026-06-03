@@ -1712,3 +1712,62 @@ Next action:
 ```text
 Do not promote this WN18RR_v4 stronger-beta-budget setting to a test run. The next implementation should directly target alpha entropy/budget stability before effect loss and before longer formal runs.
 ```
+
+## 31. Mask Logit L2 Patch
+
+Added a default-off mask logit L2 regularizer after WN18RR_v2 and WN18RR_v4 both showed alpha collapse before effect loss was active.
+
+Rationale:
+
+```text
+Prior entropy/budget penalties operate on sigmoid masks. Once logits are extreme, sigmoid gradients can be weak. A direct L2 penalty on causal/shortcut logits discourages saturation at the source while preserving default behavior when disabled.
+```
+
+Implementation:
+
+```text
+train.py: adds --mask_logit_l2_weight, default 0.0
+managers/trainer.py: adds causal_logits^2 + shortcut_logits^2 to mask_regularization when enabled
+logged metric: mask_logit_l2_loss
+default behavior: unchanged
+baseline path: unchanged
+```
+
+Smoke command:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v4 -e smoke_v5_wn18rr_v4_logit_l2 \
+  --use_causal_training \
+  --num_epochs 1 \
+  --batch_size 4 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+Smoke result:
+
+```text
+best validation AUC 0.8487
+best validation AUC-PR 0.8951
+epoch1 raw causal=0.4859
+epoch1 raw shortcut=0.4283
+epoch1 entropy causal=0.5471
+epoch1 entropy shortcut=0.6819
+epoch1 budget_loss=0.0636
+epoch1 overlap_loss=0.2036
+epoch1 mask_logit_l2_loss=3.9318
+```
+
+Conclusion:
+
+```text
+The new code path works. Early mask health is much better than the previous WN18RR_v4 smoke, but this is only a code smoke and the validation score is not competitive. A 5-epoch validation/mask diagnostic is needed before considering any longer run.
+```
