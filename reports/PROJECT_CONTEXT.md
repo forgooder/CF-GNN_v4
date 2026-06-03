@@ -2215,3 +2215,105 @@ Next action:
 ```text
 Do not run test evaluation for this configuration. WN18RR_v4 now shows that mask-only regularization and scalar effect scheduling are insufficient. Next attempts should address scorer stability directly, such as lower learning rate, tighter gradient clipping, staged/freezing of scorer branches, or disabling effect loss on WN18RR_v4 until alpha/beta masks remain healthy.
 ```
+
+## 37. WN18RR_v4 Low-LR Detach-Shortcut Clamp Diagnostic
+
+Completed `diag_v5_wn18rr_v4_logit_l2_ramp5_detach_shortcut_clamp10_lr003_16ep` on 2026-06-03 using commit `a00c695`.
+
+Configuration:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v4 -e diag_v5_wn18rr_v4_logit_l2_ramp5_detach_shortcut_clamp10_lr003_16ep \
+  --use_causal_training \
+  --num_epochs 16 \
+  --batch_size 16 \
+  --lr 0.003 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --effect_loss_ramp_epochs 5 \
+  --effect_gradient_mode detach_shortcut \
+  --effect_score_clamp 10 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC 0.9093
+best validation AUC-PR 0.9158
+```
+
+Warmup mask health:
+
+```text
+epoch6 raw causal=0.8753
+epoch6 raw shortcut=0.3987
+epoch6 entropy causal=0.3099
+epoch6 entropy shortcut=0.6721
+
+epoch9 raw causal=0.8621
+epoch9 raw shortcut=0.4002
+epoch9 entropy causal=0.3230
+epoch9 entropy shortcut=0.6726
+
+epoch10 raw causal=0.8226
+epoch10 raw shortcut=0.4033
+epoch10 entropy causal=0.3788
+epoch10 entropy shortcut=0.6738
+```
+
+Effect-ramp behavior:
+
+```text
+epoch11 effect_loss_weight=0.02
+epoch11 raw causal=0.8535
+epoch11 raw shortcut=0.4010
+epoch11 entropy causal=0.3207
+epoch11 entropy shortcut=0.6729
+epoch11 loss=32334.1504
+
+epoch12 effect_loss_weight=0.04
+epoch12 loss=7883143.5
+epoch12 original_score_mean=-406843.8651
+epoch12 causal_score_mean=-406850.4059
+epoch12 raw causal=0.9289
+epoch12 raw shortcut=0.3954
+epoch12 entropy causal=0.1296
+epoch12 entropy shortcut=0.6705
+epoch12 mask_logit_l2_loss=53.8880
+
+epoch13 effect_loss_weight=0.06
+epoch13 loss=116532120.0
+epoch13 raw causal=0.9900
+epoch13 raw shortcut=0.3905
+epoch13 entropy causal=0.0105
+epoch13 entropy shortcut=0.6686
+
+epoch16 effect_loss_weight=0.1
+epoch16 loss=1393414528.0
+epoch16 raw causal=1.0000
+epoch16 raw shortcut=0.3891
+epoch16 entropy causal=0.0001
+epoch16 entropy shortcut=0.6682
+```
+
+Conclusion:
+
+```text
+Negative diagnostic. Lowering lr from 0.01 to 0.003 reduces the magnitude of the post-effect scorer explosion, but it does not prevent alpha saturation. Shortcut remains healthy due to detach_shortcut, but causal mask collapses open after effect onset and validation AUC-PR remains only 0.9158.
+```
+
+Next action:
+
+```text
+Do not run test evaluation for this configuration. WN18RR_v4 needs a structural training-stage change rather than another scalar tweak: stage/freeze scorer branches, freeze masks before effect onset, or disable effect loss for this dataset while evaluating whether logit L2 plus causal loss alone can produce stable masks.
+```
