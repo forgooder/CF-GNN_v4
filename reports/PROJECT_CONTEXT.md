@@ -1931,3 +1931,95 @@ Next action:
 ```text
 Do not run test evaluation for this configuration. The next validation experiment should keep logit L2 but soften effect onset, either through effect_loss_ramp_epochs or a reduced/detached effect gradient path.
 ```
+
+## 34. WN18RR_v4 Logit L2 Effect-Ramp Diagnostic
+
+Completed `diag_v5_wn18rr_v4_logit_l2_effect_ramp5_16ep` on 2026-06-03 using commit `ebec04b`.
+
+Configuration:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v4 -e diag_v5_wn18rr_v4_logit_l2_effect_ramp5_16ep \
+  --use_causal_training \
+  --num_epochs 16 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --effect_loss_ramp_epochs 5 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC 0.9145
+best validation AUC-PR 0.9172
+```
+
+Warmup mask health:
+
+```text
+epoch2 raw causal=0.8808
+epoch2 raw shortcut=0.3990
+epoch2 entropy causal=0.2058
+epoch2 entropy shortcut=0.6718
+
+epoch7 raw causal=0.7140
+epoch7 raw shortcut=0.4128
+epoch7 entropy causal=0.4905
+epoch7 entropy shortcut=0.6772
+
+epoch10 raw causal=0.8082
+epoch10 raw shortcut=0.4059
+epoch10 entropy causal=0.3637
+epoch10 entropy shortcut=0.6746
+```
+
+Effect-ramp behavior:
+
+```text
+epoch11 effect_loss_weight=0.02
+epoch11 raw causal=0.6823
+epoch11 raw shortcut=0.6072
+epoch11 entropy causal=0.2634
+epoch11 entropy shortcut=0.2948
+epoch11 budget_loss=0.3603
+epoch11 mask_logit_l2_loss=34.3926
+
+epoch13 effect_loss_weight=0.06
+epoch13 raw causal=0.5868
+epoch13 raw shortcut=0.6002
+epoch13 entropy causal=0.2151
+epoch13 entropy shortcut=0.1413
+epoch13 budget_loss=0.4200
+epoch13 mask_logit_l2_loss=52.3186
+
+epoch16 effect_loss_weight=0.1
+epoch16 raw causal=0.4798
+epoch16 raw shortcut=0.5932
+epoch16 entropy causal=0.2137
+epoch16 entropy shortcut=0.1361
+epoch16 budget_loss=0.4092
+epoch16 mask_logit_l2_loss=56.8275
+```
+
+Conclusion:
+
+```text
+Negative diagnostic. Effect ramp prevents shortcut raw mean from immediately falling to the 0.33 range seen with abrupt onset, but it does not prevent shortcut entropy collapse. After ramp starts, shortcut entropy falls from 0.6746 at epoch10 to 0.2948 at epoch11 and remains near 0.12-0.14 by epoch13-16. Budget and logit penalties remain high, and validation AUC-PR is only 0.9172.
+```
+
+Next action:
+
+```text
+Do not run test evaluation for this configuration. The failure mode is no longer only onset sharpness; the effect objective still pushes saturated masks. Next validation should reduce or alter effect gradients, for example detach/attenuate effect gradients to mask parameters while retaining logit L2.
+```
