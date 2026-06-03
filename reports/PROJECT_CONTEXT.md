@@ -1130,3 +1130,69 @@ Next action:
 ```text
 Run a WN18RR_v2 diagnostic that isolates effect-loss onset, preferably with lower effect_loss_weight or a slower effect schedule, and judge it by validation/mask health only before moving to WN18RR_v4.
 ```
+
+## 22. WN18RR_v2 Low-Effect Diagnostic
+
+Completed `diag_v5_wn18rr_v2_low_effect_12ep` on 2026-06-03 using commit `4e6b533`.
+
+Configuration:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v2 -e diag_v5_wn18rr_v2_low_effect_12ep \
+  --use_causal_training \
+  --num_epochs 12 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.02 \
+  --effect_loss_warmup_epochs 10 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run. This was a validation/mask-only diagnostic.
+
+Validation:
+
+```text
+best validation AUC 0.9245
+best validation AUC-PR 0.9245 at the final saved checkpoint
+```
+
+Mask health:
+
+```text
+epoch10 effect_loss_weight=0.0
+epoch10 raw causal=0.9571
+epoch10 raw shortcut=0.3589
+epoch10 entropy causal=0.0748
+epoch10 entropy shortcut=0.6515
+epoch11 effect_loss_weight=0.02
+epoch11 raw causal=0.7956
+epoch11 raw shortcut=0.6084
+epoch11 entropy causal=0.0918
+epoch11 entropy shortcut=0.1187
+epoch11 budget_loss=0.4825
+epoch11 overlap_loss=0.4235
+epoch12 raw causal=0.6969
+epoch12 raw shortcut=0.5907
+epoch12 entropy causal=0.0675
+epoch12 entropy shortcut=0.0825
+epoch12 budget_loss=0.4891
+epoch12 overlap_loss=0.3151
+```
+
+Conclusion:
+
+```text
+Negative diagnostic. Lowering effect_loss_weight from 0.1 to 0.02 prevents the immediate shortcut raw mask collapse to zero seen in the formal WN18RR_v2 run, but it creates a different unhealthy state: both masks are high, low-entropy, and high-overlap, while budget loss remains large. This should not be promoted to test evaluation.
+```
+
+Next action:
+
+```text
+Single-parameter reduction of effect_loss_weight is not enough. Prefer a code-level effect-loss ramp or staged mask regularization before additional full test-set evaluations.
+```
