@@ -2115,3 +2115,103 @@ Next action:
 ```text
 Do not run test evaluation for this configuration. The next validation run should keep detach_shortcut/logit L2 only with an effect score clamp or lower effect loss weight, because unbounded effect scores are now the primary failure.
 ```
+
+## 36. WN18RR_v4 Detach-Shortcut Clamp Diagnostic
+
+Completed `diag_v5_wn18rr_v4_logit_l2_ramp5_detach_shortcut_clamp10_16ep` on 2026-06-03 using commit `4ec41a6`.
+
+Configuration:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v4 -e diag_v5_wn18rr_v4_logit_l2_ramp5_detach_shortcut_clamp10_16ep \
+  --use_causal_training \
+  --num_epochs 16 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --effect_loss_ramp_epochs 5 \
+  --effect_gradient_mode detach_shortcut \
+  --effect_score_clamp 10 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC 0.9101
+best validation AUC-PR 0.9156
+```
+
+Warmup mask health:
+
+```text
+epoch2 raw causal=0.5468
+epoch2 raw shortcut=0.4246
+epoch2 entropy causal=0.5287
+epoch2 entropy shortcut=0.6808
+
+epoch9 raw causal=0.5547
+epoch9 raw shortcut=0.4238
+epoch9 entropy causal=0.5398
+epoch9 entropy shortcut=0.6807
+
+epoch10 raw causal=0.4460
+epoch10 raw shortcut=0.4311
+epoch10 entropy causal=0.3171
+epoch10 entropy shortcut=0.6819
+```
+
+Effect-ramp behavior:
+
+```text
+epoch11 effect_loss_weight=0.02
+epoch11 effect_score_clamp=10.0
+epoch11 validation AUC-PR=0.6236
+epoch11 original_score_mean=-1512.3225
+epoch11 causal_score_mean=-1518.8715
+epoch11 raw causal=0.6271
+epoch11 raw shortcut=0.4178
+epoch11 entropy causal=0.2573
+epoch11 entropy shortcut=0.6774
+
+epoch12 effect_loss_weight=0.04
+epoch12 loss=1101509248.0
+epoch12 original_score_mean=-90651984.1542
+epoch12 causal_score_mean=-90605955.2994
+epoch12 raw causal=0.4517
+epoch12 raw shortcut=0.4284
+epoch12 entropy causal=0.0152
+epoch12 entropy shortcut=0.6574
+epoch12 mask_logit_l2_loss=5503.7626
+
+epoch16 effect_loss_weight=0.1
+epoch16 loss=491061346304.0
+epoch16 original_score_mean=-41014145032.2414
+epoch16 causal_score_mean=-40995157673.9799
+epoch16 raw causal=0.9994
+epoch16 raw shortcut=0.3885
+epoch16 entropy causal=0.0001
+epoch16 entropy shortcut=0.6364
+epoch16 mask_logit_l2_loss=51396.3691
+```
+
+Conclusion:
+
+```text
+Negative diagnostic. effect_score_clamp=10 bounds the effect loss values but does not prevent original/causal scorer magnitudes from diverging after effect onset. The model still collapses alpha and produces extreme score magnitudes, while validation AUC-PR peaks at only 0.9156.
+```
+
+Next action:
+
+```text
+Do not run test evaluation for this configuration. WN18RR_v4 now shows that mask-only regularization and scalar effect scheduling are insufficient. Next attempts should address scorer stability directly, such as lower learning rate, tighter gradient clipping, staged/freezing of scorer branches, or disabling effect loss on WN18RR_v4 until alpha/beta masks remain healthy.
+```
