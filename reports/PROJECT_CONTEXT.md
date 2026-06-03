@@ -1464,3 +1464,57 @@ Next action:
 ```text
 Do not continue this configuration to test. The next change should constrain effect score scale or delay/clip effect gradients, while separately enforcing alpha entropy/budget before effect training. A detach-only solution is insufficient.
 ```
+
+## 27. Effect Score Clamp Patch
+
+Added a default-off training-time clamp for the scores used in `effect_loss`, after `diag_v5_wn18rr_v2_detach_shortcut_15ep` showed severe effect loss and score explosion.
+
+Implementation:
+
+```text
+train.py: adds --effect_score_clamp, default 0.0
+managers/trainer.py: clamps only effect_pos/effect_neg used for effect_loss when value > 0
+default behavior: unchanged
+test-time score definitions: unchanged
+```
+
+Smoke command:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v2 -e smoke_v5_effect_clamp \
+  --use_causal_training \
+  --num_epochs 1 \
+  --batch_size 4 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 0 \
+  --effect_loss_ramp_epochs 5 \
+  --effect_gradient_mode detach_shortcut \
+  --effect_score_clamp 100 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+Smoke result:
+
+```text
+best validation AUC 0.9264
+best validation AUC-PR 0.9213
+epoch1 effect_loss_weight=0.0200
+epoch1 effect_loss_ramp_factor=0.2000
+epoch1 effect_score_clamp=100.0
+epoch1 raw causal=0.5979
+epoch1 raw shortcut=0.3920
+epoch1 entropy causal=0.0809
+epoch1 entropy shortcut=0.6643
+```
+
+Conclusion:
+
+```text
+The clamp code path works and is default-off. The smoke is not a formal performance result. Next diagnostic should rerun the 15-epoch WN18RR_v2 detach_shortcut+ramp setting with effect_score_clamp=100 and stop before test evaluation unless mask health and stability improve.
+```

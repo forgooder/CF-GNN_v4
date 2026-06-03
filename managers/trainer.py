@@ -190,7 +190,14 @@ class Trainer():
             shortcut_pos = shortcut_pos.detach()
             shortcut_neg = shortcut_neg.detach()
 
-        return causal_pos - shortcut_pos, causal_neg - shortcut_neg
+        effect_pos = causal_pos - shortcut_pos
+        effect_neg = causal_neg - shortcut_neg
+        effect_score_clamp = getattr(self.params, 'effect_score_clamp', 0.0)
+        if effect_score_clamp and effect_score_clamp > 0:
+            effect_pos = torch.clamp(effect_pos, -effect_score_clamp, effect_score_clamp)
+            effect_neg = torch.clamp(effect_neg, -effect_score_clamp, effect_score_clamp)
+
+        return effect_pos, effect_neg
 
     def causal_training_step(self, data_pos, data_neg):
         outputs_pos = self.graph_classifier(data_pos, mode='all')
@@ -222,6 +229,7 @@ class Trainer():
             'effect_loss': effect_loss.item(),
             'effect_loss_weight': effect_loss_weight,
             'effect_loss_ramp_factor': effect_loss_ramp_factor,
+            'effect_score_clamp': getattr(self.params, 'effect_score_clamp', 0.0),
             'mask_reg_loss': mask_reg_loss.item(),
             'shortcut_penalty': shortcut_loss.item(),
             'total_loss': total_loss.item(),
