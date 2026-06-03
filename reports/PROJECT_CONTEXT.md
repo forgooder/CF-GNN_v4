@@ -1389,3 +1389,78 @@ Conclusion:
 ```text
 The new flag works and preserves old behavior by default. The smoke is not a formal result. The next diagnostic should combine warmup=10, ramp=10, and effect_gradient_mode=detach_shortcut for 15 epochs, then judge mask health before any test evaluation.
 ```
+
+## 26. WN18RR_v2 Detach Shortcut Diagnostic
+
+Completed `diag_v5_wn18rr_v2_detach_shortcut_15ep` on 2026-06-03 using commit `7160dcf`.
+
+Configuration:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v2 -e diag_v5_wn18rr_v2_detach_shortcut_15ep \
+  --use_causal_training \
+  --num_epochs 15 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --effect_loss_ramp_epochs 10 \
+  --effect_gradient_mode detach_shortcut \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC 0.9326
+best validation AUC-PR 0.9289
+```
+
+Mask and stability diagnostics:
+
+```text
+epoch10 effect_loss_weight=0.0
+epoch10 raw causal=0.5974
+epoch10 raw shortcut=0.3928
+epoch10 entropy causal=0.1136
+epoch10 entropy shortcut=0.6653
+epoch11 effect_loss_weight=0.01
+epoch11 raw causal=0.8372
+epoch11 raw shortcut=0.3690
+epoch11 entropy causal=0.0741
+epoch11 entropy shortcut=0.6555
+epoch11 effect_loss=79.2659
+epoch12 effect_loss_weight=0.02
+epoch12 raw causal=0.9554
+epoch12 raw shortcut=0.3549
+epoch12 entropy causal=0.0051
+epoch12 entropy shortcut=0.6454
+epoch12 effect_loss=6045.9187
+epoch12 weight_norm=353.4869
+epoch15 effect_loss_weight=0.05
+epoch15 raw causal=0.9995
+epoch15 raw shortcut=0.3519
+epoch15 entropy causal=0.0004
+epoch15 entropy shortcut=0.6471
+epoch15 effect_loss=8040453.9714
+epoch15 weight_norm=568.7808
+```
+
+Conclusion:
+
+```text
+Negative diagnostic. detach_shortcut prevents shortcut raw mask from collapsing to zero, but it does not prevent alpha collapse. It also permits severe causal/effect score explosion after ramp starts. The failure mode changes from beta-zero collapse to alpha-full-open collapse plus unstable effect scores.
+```
+
+Next action:
+
+```text
+Do not continue this configuration to test. The next change should constrain effect score scale or delay/clip effect gradients, while separately enforcing alpha entropy/budget before effect training. A detach-only solution is insufficient.
+```
