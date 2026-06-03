@@ -2023,3 +2023,95 @@ Next action:
 ```text
 Do not run test evaluation for this configuration. The failure mode is no longer only onset sharpness; the effect objective still pushes saturated masks. Next validation should reduce or alter effect gradients, for example detach/attenuate effect gradients to mask parameters while retaining logit L2.
 ```
+
+## 35. WN18RR_v4 Logit L2 Ramp Detach-Shortcut Diagnostic
+
+Completed `diag_v5_wn18rr_v4_logit_l2_ramp5_detach_shortcut_16ep` on 2026-06-03 using commit `0840734`.
+
+Configuration:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v4 -e diag_v5_wn18rr_v4_logit_l2_ramp5_detach_shortcut_16ep \
+  --use_causal_training \
+  --num_epochs 16 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --effect_loss_ramp_epochs 5 \
+  --effect_gradient_mode detach_shortcut \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC 0.9145
+best validation AUC-PR 0.9179
+```
+
+Warmup mask health:
+
+```text
+epoch6 raw causal=0.5424
+epoch6 raw shortcut=0.4257
+epoch6 entropy causal=0.5594
+epoch6 entropy shortcut=0.6814
+
+epoch9 raw causal=0.4798
+epoch9 raw shortcut=0.4295
+epoch9 entropy causal=0.5146
+epoch9 entropy shortcut=0.6823
+
+epoch10 raw causal=0.6199
+epoch10 raw shortcut=0.4199
+epoch10 entropy causal=0.4912
+epoch10 entropy shortcut=0.6794
+```
+
+Effect-ramp behavior:
+
+```text
+epoch11 effect_loss_weight=0.02
+epoch11 raw causal=0.8356
+epoch11 raw shortcut=0.4027
+epoch11 entropy causal=0.1812
+epoch11 entropy shortcut=0.6728
+epoch11 mask_logit_l2_loss=25.9349
+
+epoch12 effect_loss_weight=0.04
+epoch12 loss=246441328.0
+epoch12 raw causal=0.9834
+epoch12 raw shortcut=0.3893
+epoch12 entropy causal=0.0106
+epoch12 entropy shortcut=0.6600
+epoch12 mask_logit_l2_loss=3974.8890
+
+epoch16 effect_loss_weight=0.1
+epoch16 loss=497083121664.0
+epoch16 raw causal=0.9851
+epoch16 raw shortcut=0.3890
+epoch16 entropy causal=0.00003
+epoch16 entropy shortcut=0.6639
+epoch16 mask_logit_l2_loss=41699.3956
+```
+
+Conclusion:
+
+```text
+Negative diagnostic. detach_shortcut protects shortcut entropy during effect ramp, but it shifts the failure to the causal branch. After effect loss starts, causal scores and logits explode, causal mask saturates open, and loss grows from normal scale to 2.46e8 at epoch12 and 4.97e11 at epoch16.
+```
+
+Next action:
+
+```text
+Do not run test evaluation for this configuration. The next validation run should keep detach_shortcut/logit L2 only with an effect score clamp or lower effect loss weight, because unbounded effect scores are now the primary failure.
+```
