@@ -165,6 +165,17 @@ class Trainer():
         shortcut_neg = outputs_neg['shortcut'].view(len(shortcut_pos), -1).mean(dim=1)
         return shortcut_penalty_weight * torch.abs(shortcut_pos - shortcut_neg).mean()
 
+    def current_effect_loss_weight(self):
+        target_weight = getattr(self.params, 'effect_loss_weight', 1.0)
+        warmup_epochs = getattr(self.params, 'effect_loss_warmup_epochs', 0)
+        ramp_epochs = max(0, getattr(self.params, 'effect_loss_ramp_epochs', 0))
+        if self.current_epoch <= warmup_epochs:
+            return 0.0, 0.0
+        if ramp_epochs == 0:
+            return target_weight, 1.0
+        ramp_progress = min(1.0, float(self.current_epoch - warmup_epochs) / float(ramp_epochs))
+        return target_weight * ramp_progress, ramp_progress
+
     def causal_training_step(self, data_pos, data_neg):
         outputs_pos = self.graph_classifier(data_pos, mode='all')
         outputs_neg = self.graph_classifier(data_neg, mode='all')
@@ -174,8 +185,7 @@ class Trainer():
         effect_loss = self.ranking_loss(outputs_pos['effect'], outputs_neg['effect'])
         mask_reg_loss, mask_stats = self.mask_regularization(outputs_pos, outputs_neg)
         shortcut_loss = self.shortcut_penalty(outputs_pos, outputs_neg)
-        effect_warmup_epochs = getattr(self.params, 'effect_loss_warmup_epochs', 0)
-        effect_loss_weight = 0.0 if self.current_epoch <= effect_warmup_epochs else getattr(self.params, 'effect_loss_weight', 1.0)
+        effect_loss_weight, effect_loss_ramp_factor = self.current_effect_loss_weight()
 
         total_loss = (
             original_loss
@@ -194,6 +204,7 @@ class Trainer():
             'causal_loss': causal_loss.item(),
             'effect_loss': effect_loss.item(),
             'effect_loss_weight': effect_loss_weight,
+            'effect_loss_ramp_factor': effect_loss_ramp_factor,
             'mask_reg_loss': mask_reg_loss.item(),
             'shortcut_penalty': shortcut_loss.item(),
             'total_loss': total_loss.item(),

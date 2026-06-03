@@ -1196,3 +1196,64 @@ Next action:
 ```text
 Single-parameter reduction of effect_loss_weight is not enough. Prefer a code-level effect-loss ramp or staged mask regularization before additional full test-set evaluations.
 ```
+
+## 23. Effect Loss Ramp Patch
+
+Added a default-off effect-loss ramp after the WN18RR_v2 low-effect diagnostic showed that a hard switch from 0 to 0.1 can trigger shortcut collapse, while a fixed 0.02 effect weight avoids beta-zero collapse but leaves masks unhealthy.
+
+Implementation:
+
+```text
+train.py: adds --effect_loss_ramp_epochs, default 0
+managers/trainer.py: computes current effect loss weight from warmup plus optional linear ramp
+default behavior: unchanged, because ramp=0 keeps the old step activation
+```
+
+Schedule:
+
+```text
+if current_epoch <= effect_loss_warmup_epochs:
+  effect_loss_weight = 0
+elif effect_loss_ramp_epochs == 0:
+  effect_loss_weight = target effect_loss_weight
+else:
+  effect_loss_weight = target * min(1, (current_epoch - warmup) / ramp_epochs)
+```
+
+Smoke command:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v2 -e smoke_v5_effect_ramp \
+  --use_causal_training \
+  --num_epochs 1 \
+  --batch_size 4 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 0 \
+  --effect_loss_ramp_epochs 5 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+Smoke result:
+
+```text
+best validation AUC 0.9067
+best validation AUC-PR 0.9262
+epoch1 effect_loss_weight=0.0200
+epoch1 effect_loss_ramp_factor=0.2000
+epoch1 raw causal=0.8588
+epoch1 raw shortcut=0.2803
+epoch1 entropy causal=0.0560
+epoch1 entropy shortcut=0.1831
+```
+
+Conclusion:
+
+```text
+The new flag works and preserves the old default behavior. The smoke is not a performance result. Next diagnostic should use WN18RR_v2 with warmup=10 and ramp=10 to test whether gradual effect activation prevents the epoch11 beta collapse without producing high-overlap masks.
+```

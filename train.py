@@ -109,6 +109,8 @@ if __name__ == '__main__':
                         help="Weight for causal effect margin ranking loss when causal training is enabled")
     parser.add_argument("--effect_loss_warmup_epochs", type=int, default=0,
                         help="Number of initial epochs with effect loss disabled during causal training")
+    parser.add_argument("--effect_loss_ramp_epochs", type=int, default=0,
+                        help="Number of epochs used to linearly ramp effect loss after warmup; 0 preserves step activation")
     parser.add_argument("--shortcut_penalty_weight", type=float, default=0.0,
                         help="Optional penalty that discourages shortcut scores from separating positive and negative samples")
     parser.add_argument("--mask_sparsity_weight", type=float, default=0.0,
