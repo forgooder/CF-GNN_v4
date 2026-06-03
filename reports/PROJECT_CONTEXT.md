@@ -2505,3 +2505,71 @@ Next action:
 ```text
 Do not run test evaluation. For NELL_v1, logit L2 plus causal-only loss is not enough to keep alpha healthy beyond a short smoke. Next diagnostic should target alpha directly, for example a stronger causal-mask budget/logit penalty, staged mask freezing, or a dedicated alpha entropy floor before considering formal evaluation.
 ```
+
+## 41. nell_v1 Lower Alpha Budget Target Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d nell_v1 -e diag_v5_nell_v1_alpha_budget035_10ep \
+  --use_causal_training \
+  --num_epochs 10 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.1 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_target 0.35 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC 0.9054
+best validation AUC-PR 0.9146
+```
+
+Mask checkpoints:
+
+```text
+epoch1 raw causal=0.3482
+epoch1 raw shortcut=0.4440
+epoch1 entropy causal=0.4761
+epoch1 entropy shortcut=0.6863
+epoch1 budget_loss=0.0665
+epoch1 mask_logit_l2_loss=5.6705
+
+epoch5 raw causal=0.7914
+epoch5 raw shortcut=0.4250
+epoch5 entropy causal=0.1229
+epoch5 entropy shortcut=0.6809
+epoch5 budget_loss=0.3258
+epoch5 mask_logit_l2_loss=50.6074
+
+epoch10 raw causal=0.8050
+epoch10 raw shortcut=0.4239
+epoch10 entropy causal=0.1171
+epoch10 entropy shortcut=0.6809
+epoch10 budget_loss=0.3300
+epoch10 overlap_loss=0.3365
+epoch10 mask_logit_l2_loss=50.4665
+epoch10 weight_norm=255.6158
+```
+
+Conclusion:
+
+```text
+Negative diagnostic. Lowering the causal budget target to 0.35 and increasing budget weight to 0.1 improves only the first epoch. Alpha still re-hardens by epoch5 and reaches raw causal=0.8050 with entropy=0.1171 by epoch10. Validation also underperforms the prior causal-only 10 epoch run: AUC-PR 0.9146 versus 0.9190.
+```
+
+Next action:
+
+```text
+Do not run test evaluation. NELL_v1 now shows that shared budget/target tuning is insufficient for alpha collapse. The next useful change is an alpha-specific default-off control, such as separate alpha entropy floor/logit L2 weights, or a staged/frozen mask schedule.
+```
