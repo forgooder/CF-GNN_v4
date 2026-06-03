@@ -1016,3 +1016,49 @@ Conclusion:
 ```text
 Negative diagnostic result. Entropy floor weight 0.05 is too weak and does not prevent alpha collapse. The best AUC-PR and Hits@10 remain below same-environment baseline. Do not repeat this exact configuration.
 ```
+
+## 20. Latest WN18RR_v2 Smoke
+
+Completed `smoke_v5_wn18rr_v2_stronger_beta_budget` on 2026-06-03 using commit `e3dd850`.
+
+Configuration:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v2 -e smoke_v5_wn18rr_v2_stronger_beta_budget \
+  --use_causal_training \
+  --num_epochs 1 \
+  --batch_size 4 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+Best validation result observed during the smoke epoch:
+
+```text
+AUC 0.9415
+AUC-PR 0.9486
+```
+
+Mask health:
+
+```text
+raw causal=0.7471
+raw shortcut=0.3790
+entropy causal=0.1732
+entropy shortcut=0.6598
+budget_loss=0.2294
+overlap_loss=0.2695
+```
+
+Conclusion:
+
+```text
+WN18RR_v2 causal path passes smoke. No epoch-1 mask collapse, but alpha raw mean is already high and overlap is non-trivial. Proceed to formal WN18RR_v2 stronger-beta-budget run and monitor late-mask health before drawing any cross-dataset conclusion.
+```
