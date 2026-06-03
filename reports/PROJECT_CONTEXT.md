@@ -671,6 +671,41 @@ shortcut_mask_entropy 0.0146
 
 Conclusion: the first formal v5 WN18RR_v1 original-selection configuration is a negative result. It does not beat the same-environment baseline and does not prevent late shortcut-mask collapse. Next WN18RR_v1 work should prioritize anti-collapse changes or stronger beta preservation before broad dataset expansion.
 
+`causal_v5_wn18rr_v1_stronger_beta_budget` was completed on 2026-06-03 09:35 CST with stronger budget pressure and equal causal/shortcut targets:
+
+```text
+mask_gamma 0.5
+mask_budget_weight 0.05
+causal_mask_target 0.45
+shortcut_mask_target 0.45
+effect_loss_warmup_epochs 10
+training score_mode causal_plus_effect
+```
+
+Best test AUC-PR mode was `original`:
+
+```text
+AUC 0.9240
+AUC-PR 0.9259
+MRR 0.7021
+Hits@1 0.6434
+Hits@5 0.7665
+Hits@10 0.7751
+```
+
+Epoch 100 mask diagnostics:
+
+```text
+causal_mask_raw_mean 0.8379
+shortcut_mask_raw_mean 0.3172
+causal_mask_entropy 0.0144
+shortcut_mask_entropy 0.0270
+mask_budget_loss 0.5086
+mask_overlap_loss 0.1889
+```
+
+Conclusion: stronger beta budget partially mitigates the specific shortcut raw mask collapse, but it does not improve WN18RR_v1 metrics and does not solve alpha/entropy collapse. Budget target tuning alone is insufficient. Next anti-collapse attempt should add an explicit entropy floor or temperature schedule, and should prevent alpha saturation without letting overlap dominate.
+
 ## 13. Training Log Checks
 
 ```bash
