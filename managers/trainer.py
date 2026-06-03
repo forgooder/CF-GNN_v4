@@ -92,6 +92,8 @@ class Trainer():
     def mask_regularization(self, outputs_pos, outputs_neg):
         mask_sparsity_weight = getattr(self.params, 'mask_sparsity_weight', 0.0)
         mask_entropy_weight = getattr(self.params, 'mask_entropy_weight', 0.0)
+        mask_entropy_floor_weight = getattr(self.params, 'mask_entropy_floor_weight', 0.0)
+        mask_entropy_floor = getattr(self.params, 'mask_entropy_floor', 0.1)
         mask_budget_weight = getattr(self.params, 'mask_budget_weight', 0.0)
         mask_overlap_weight = getattr(self.params, 'mask_overlap_weight', 0.0)
 
@@ -129,8 +131,18 @@ class Trainer():
             + F.mse_loss(shortcut_masks, shortcut_targets)
         )
         overlap_loss = (causal_masks * shortcut_masks).mean()
+        entropy_floor = torch.tensor(float(mask_entropy_floor), device=self.params.device)
+        entropy_floor_loss = (
+            torch.relu(entropy_floor - causal_entropy).pow(2)
+            + torch.relu(entropy_floor - shortcut_entropy).pow(2)
+        )
         legacy_reg = mask_sparsity_weight * causal_sparsity + mask_entropy_weight * causal_entropy
-        reg_loss = legacy_reg + mask_budget_weight * budget_loss + mask_overlap_weight * overlap_loss
+        reg_loss = (
+            legacy_reg
+            + mask_budget_weight * budget_loss
+            + mask_overlap_weight * overlap_loss
+            + mask_entropy_floor_weight * entropy_floor_loss
+        )
 
         stats = {
             'mask_reg_loss': reg_loss.item(),
@@ -139,7 +151,8 @@ class Trainer():
             'causal_mask_entropy': causal_entropy.item(),
             'shortcut_mask_entropy': shortcut_entropy.item(),
             'mask_budget_loss': budget_loss.item(),
-            'mask_overlap_loss': overlap_loss.item()
+            'mask_overlap_loss': overlap_loss.item(),
+            'mask_entropy_floor_loss': entropy_floor_loss.item()
         }
         return reg_loss, stats
 

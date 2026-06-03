@@ -115,6 +115,10 @@ if __name__ == '__main__':
                         help="Backward-compatible optional sparsity penalty on raw causal edge masks")
     parser.add_argument("--mask_entropy_weight", type=float, default=0.0,
                         help="Backward-compatible optional entropy penalty on raw causal edge masks")
+    parser.add_argument("--mask_entropy_floor_weight", type=float, default=0.0,
+                        help="Weight for entropy-floor loss that discourages alpha/beta mask saturation")
+    parser.add_argument("--mask_entropy_floor", type=float, default=0.1,
+                        help="Minimum desired entropy for raw causal and shortcut masks")
     parser.add_argument("--mask_gamma", type=float, default=1.0,
                         help="Residual mask strength: effective_mask = 1 - gamma + gamma * raw_mask")
     parser.add_argument("--mask_budget_weight", type=float, default=0.0,

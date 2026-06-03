@@ -706,6 +706,49 @@ mask_overlap_loss 0.1889
 
 Conclusion: stronger beta budget partially mitigates the specific shortcut raw mask collapse, but it does not improve WN18RR_v1 metrics and does not solve alpha/entropy collapse. Budget target tuning alone is insufficient. Next anti-collapse attempt should add an explicit entropy floor or temperature schedule, and should prevent alpha saturation without letting overlap dominate.
 
+Entropy-floor patch status as of 2026-06-03 09:43 CST:
+
+```text
+--mask_entropy_floor_weight
+--mask_entropy_floor
+```
+
+These parameters were added after observing that the legacy `--mask_entropy_weight` is an entropy penalty: positive values minimize entropy and therefore worsen the current low-entropy collapse problem. The new entropy-floor loss is default-off and penalizes only entropy below the configured floor for both causal and shortcut raw masks.
+
+Smoke command:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e smoke_v5_entropy_floor \
+  --use_causal_training \
+  --num_epochs 1 \
+  --batch_size 4 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_entropy_floor_weight 0.05 \
+  --mask_entropy_floor 0.2 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+Smoke result:
+
+```text
+validation AUC 0.8369
+validation AUC-PR 0.8850
+causal_mask_raw_mean 0.4878
+shortcut_mask_raw_mean 0.4041
+causal_mask_entropy 0.1988
+shortcut_mask_entropy 0.6699
+mask_entropy_floor_loss 0.0104
+```
+
+Conclusion: code path runs and logs the expected floor loss. A formal WN18RR_v1 entropy-floor run is the next diagnostic experiment.
+
 ## 13. Training Log Checks
 
 ```bash
