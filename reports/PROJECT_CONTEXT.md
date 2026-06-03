@@ -1771,3 +1771,78 @@ Conclusion:
 ```text
 The new code path works. Early mask health is much better than the previous WN18RR_v4 smoke, but this is only a code smoke and the validation score is not competitive. A 5-epoch validation/mask diagnostic is needed before considering any longer run.
 ```
+
+## 32. WN18RR_v4 Logit L2 5-Epoch Diagnostic
+
+Completed `diag_v5_wn18rr_v4_logit_l2_5ep` on 2026-06-03 using commit `e4267f3`.
+
+Configuration:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v4 -e diag_v5_wn18rr_v4_logit_l2_5ep \
+  --use_causal_training \
+  --num_epochs 5 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC 0.9121
+best validation AUC-PR 0.9158
+```
+
+Mask health:
+
+```text
+epoch1 raw causal=0.5926
+epoch1 raw shortcut=0.4221
+epoch1 entropy causal=0.4237
+epoch1 entropy shortcut=0.6793
+epoch2 raw causal=0.3356
+epoch2 raw shortcut=0.4393
+epoch2 entropy causal=0.4876
+epoch2 entropy shortcut=0.6847
+epoch4 raw causal=0.5069
+epoch4 raw shortcut=0.4269
+epoch4 entropy causal=0.2769
+epoch4 entropy shortcut=0.6805
+epoch5 raw causal=0.4876
+epoch5 raw shortcut=0.4287
+epoch5 entropy causal=0.3759
+epoch5 entropy shortcut=0.6815
+epoch5 mask_logit_l2_loss=8.5961
+```
+
+Comparison against no-logit-L2 WN18RR_v4 5-epoch diagnostic:
+
+```text
+no-L2 epoch2 raw causal=0.0354, entropy causal=0.0329
+logit-L2 epoch2 raw causal=0.3356, entropy causal=0.4876
+no-L2 epoch5 raw causal=0.9766, entropy causal=0.0246
+logit-L2 epoch5 raw causal=0.4876, entropy causal=0.3759
+```
+
+Conclusion:
+
+```text
+Positive mask diagnostic. mask_logit_l2_weight=0.001 materially mitigates WN18RR_v4 warmup alpha collapse and keeps shortcut healthy. However, validation performance is not yet competitive, and this is not a formal test result.
+```
+
+Next action:
+
+```text
+Run a longer WN18RR_v4 validation/mask diagnostic with logit L2 before any test-set evaluation. Watch whether alpha remains healthy after effect loss turns on at epoch11.
+```
