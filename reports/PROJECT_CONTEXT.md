@@ -1518,3 +1518,79 @@ Conclusion:
 ```text
 The clamp code path works and is default-off. The smoke is not a formal performance result. Next diagnostic should rerun the 15-epoch WN18RR_v2 detach_shortcut+ramp setting with effect_score_clamp=100 and stop before test evaluation unless mask health and stability improve.
 ```
+
+## 28. WN18RR_v2 Detach Shortcut Plus Clamp Diagnostic
+
+Completed `diag_v5_wn18rr_v2_detach_clamp_15ep` on 2026-06-03 using commit `b907863`.
+
+Configuration:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v2 -e diag_v5_wn18rr_v2_detach_clamp_15ep \
+  --use_causal_training \
+  --num_epochs 15 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --effect_loss_ramp_epochs 10 \
+  --effect_gradient_mode detach_shortcut \
+  --effect_score_clamp 100 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC 0.9316
+best validation AUC-PR 0.9285
+```
+
+Mask and stability diagnostics:
+
+```text
+epoch1 raw causal=0.5527
+epoch1 raw shortcut=0.3995
+epoch1 entropy causal=0.5238
+epoch1 entropy shortcut=0.6707
+epoch10 effect_loss_weight=0.0
+epoch10 raw causal=0.6582
+epoch10 raw shortcut=0.3879
+epoch10 entropy causal=0.1331
+epoch10 entropy shortcut=0.6636
+epoch11 effect_loss_weight=0.01
+epoch11 raw causal=0.8464
+epoch11 raw shortcut=0.3699
+epoch11 entropy causal=0.1149
+epoch11 entropy shortcut=0.6564
+epoch12 weight_norm=345.1150
+epoch12 raw causal=0.7835
+epoch12 entropy causal=0.0930
+epoch14 weight_norm=914.1380
+epoch14 raw causal=0.9993
+epoch14 entropy causal=0.0008
+epoch15 weight_norm=1372.5833
+epoch15 raw causal=0.9933
+epoch15 raw shortcut=0.3523
+epoch15 entropy causal=0.0015
+epoch15 entropy shortcut=0.6480
+```
+
+Conclusion:
+
+```text
+Negative diagnostic. The clamp makes early training look healthier and prevents the effect_loss value from reaching the millions, but it does not prevent the underlying original/causal/shortcut scores from exploding. Alpha still saturates open by epoch14/15, and validation degrades during the unstable phase.
+```
+
+Next action:
+
+```text
+Do not continue scalar/schedule/clamp-only WN18RR_v2 tuning. The next version needs direct scorer stabilization or a staged training design where mask heads are regularized/pretrained before effect training updates the shared scorer. Current v5 options can mitigate beta collapse but do not solve alpha collapse.
+```
