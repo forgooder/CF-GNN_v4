@@ -1062,3 +1062,71 @@ Conclusion:
 ```text
 WN18RR_v2 causal path passes smoke. No epoch-1 mask collapse, but alpha raw mean is already high and overlap is non-trivial. Proceed to formal WN18RR_v2 stronger-beta-budget run and monitor late-mask health before drawing any cross-dataset conclusion.
 ```
+
+## 21. Latest WN18RR_v2 Formal Early-Stop Result
+
+Started `causal_v5_wn18rr_v2_stronger_beta_budget` on 2026-06-03 using commit `11d9dad`.
+The run was intentionally stopped after epoch 12 because mask collapse became clear immediately after effect loss warmup ended.
+
+Configuration:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v2 -e causal_v5_wn18rr_v2_stronger_beta_budget \
+  --use_causal_training \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+Best validation checkpoint was selected by validation AUC before collapse dominated training.
+
+Test AUC/AUC-PR:
+
+```text
+original: 0.9263 / 0.9268
+causal: 0.9235 / 0.9254
+effect: 0.8204 / 0.8613
+causal_plus_effect: 0.9275 / 0.9264
+```
+
+Ranking with `original`:
+
+```text
+MRR 0.7391
+Hits@1 0.7136
+Hits@5 0.7602
+Hits@10 0.7628
+```
+
+Mask health:
+
+```text
+epoch9 raw causal=0.9670
+epoch9 raw shortcut=0.3556
+epoch9 entropy causal=0.0086
+epoch11 effect_loss_weight=0.1
+epoch11 raw shortcut=0.0007
+epoch11 entropy shortcut=0.0017
+epoch12 raw shortcut=0.00003
+epoch12 entropy shortcut=0.00027
+epoch12 entropy causal=0.0034
+epoch12 budget_loss=0.4740
+```
+
+Conclusion:
+
+```text
+Negative formal early-stop result. The stronger-beta-budget configuration does not prevent WN18RR_v2 collapse. Alpha entropy is already near zero before effect loss turns on, and beta collapses almost immediately when effect_loss_weight becomes 0.1. AUC-PR 0.9268 is below the WN18RR_v2 paper target 0.9418, and Hits@10 0.7628 is below the paper target 0.7868.
+```
+
+Next action:
+
+```text
+Run a WN18RR_v2 diagnostic that isolates effect-loss onset, preferably with lower effect_loss_weight or a slower effect schedule, and judge it by validation/mask health only before moving to WN18RR_v4.
+```
