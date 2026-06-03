@@ -1594,3 +1594,57 @@ Next action:
 ```text
 Do not continue scalar/schedule/clamp-only WN18RR_v2 tuning. The next version needs direct scorer stabilization or a staged training design where mask heads are regularized/pretrained before effect training updates the shared scorer. Current v5 options can mitigate beta collapse but do not solve alpha collapse.
 ```
+
+## 29. Latest WN18RR_v4 Smoke
+
+Completed `smoke_v5_wn18rr_v4_stronger_beta_budget` on 2026-06-03 using commit `7014a7b`.
+This run built the WN18RR_v4 train/valid LMDB caches and did not use the test set.
+
+Configuration:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v4 -e smoke_v5_wn18rr_v4_stronger_beta_budget \
+  --use_causal_training \
+  --num_epochs 1 \
+  --batch_size 4 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 10 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+Validation:
+
+```text
+best validation AUC 0.9225
+best validation AUC-PR 0.9367
+```
+
+Mask health:
+
+```text
+epoch1 effect_loss_weight=0.0
+epoch1 raw causal=0.2078
+epoch1 raw shortcut=0.4310
+epoch1 entropy causal=0.0829
+epoch1 entropy shortcut=0.6803
+epoch1 budget_loss=0.1993
+epoch1 overlap_loss=0.0761
+```
+
+Conclusion:
+
+```text
+WN18RR_v4 causal path passes smoke and caches are available for later runs. The shortcut mask is healthy in epoch1, but causal mask entropy is already low and raw causal is well below the 0.45 target. Treat this as path validation only, not a performance result.
+```
+
+Next action:
+
+```text
+Run a short WN18RR_v4 validation/mask diagnostic before any formal test evaluation. Because WN18RR_v2 scalar/schedule/clamp tuning failed and WN18RR_v4 alpha entropy is already low in smoke, monitor early alpha collapse rather than promoting directly to a full test-set run.
+```
