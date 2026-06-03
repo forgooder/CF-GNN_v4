@@ -1334,3 +1334,58 @@ Next action:
 ```text
 Stop scalar-only WN18RR_v2 tuning. The next code-level candidate should add staged mask regularization or detach/stop-gradient logic so alpha/beta masks do not chase each other through the effect objective. Additional full test evaluation is not justified from this diagnostic.
 ```
+
+## 25. Effect Gradient Isolation Patch
+
+Added a default-off effect-gradient mode after the WN18RR_v2 ramp diagnostic showed that schedule changes alone do not stop alpha/beta masks from chasing each other through the effect objective.
+
+Implementation:
+
+```text
+train.py: adds --effect_gradient_mode
+choices: full, detach_shortcut, detach_causal, detach_both
+default: full
+```
+
+The option affects only the tensors used to compute training-time `effect_loss`. It does not change model forward outputs, score selection, AUC/AUC-PR, ranking metrics, or test-time score definitions.
+
+Smoke command:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v2 -e smoke_v5_effect_detach_shortcut \
+  --use_causal_training \
+  --num_epochs 1 \
+  --batch_size 4 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.1 \
+  --effect_loss_warmup_epochs 0 \
+  --effect_loss_ramp_epochs 5 \
+  --effect_gradient_mode detach_shortcut \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+Smoke result:
+
+```text
+best validation AUC 0.9586
+best validation AUC-PR 0.9609
+epoch1 effect_loss_weight=0.0200
+epoch1 effect_loss_ramp_factor=0.2000
+epoch1 raw causal=0.6402
+epoch1 raw shortcut=0.3881
+epoch1 entropy causal=0.1767
+epoch1 entropy shortcut=0.6632
+epoch1 budget_loss=0.2172
+epoch1 overlap_loss=0.2316
+```
+
+Conclusion:
+
+```text
+The new flag works and preserves old behavior by default. The smoke is not a formal result. The next diagnostic should combine warmup=10, ramp=10, and effect_gradient_mode=detach_shortcut for 15 epochs, then judge mask health before any test evaluation.
+```

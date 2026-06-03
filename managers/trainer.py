@@ -176,13 +176,30 @@ class Trainer():
         ramp_progress = min(1.0, float(self.current_epoch - warmup_epochs) / float(ramp_epochs))
         return target_weight * ramp_progress, ramp_progress
 
+    def effect_scores_for_loss(self, outputs_pos, outputs_neg):
+        mode = getattr(self.params, 'effect_gradient_mode', 'full')
+        causal_pos = outputs_pos['causal']
+        causal_neg = outputs_neg['causal']
+        shortcut_pos = outputs_pos['shortcut']
+        shortcut_neg = outputs_neg['shortcut']
+
+        if mode in ['detach_causal', 'detach_both']:
+            causal_pos = causal_pos.detach()
+            causal_neg = causal_neg.detach()
+        if mode in ['detach_shortcut', 'detach_both']:
+            shortcut_pos = shortcut_pos.detach()
+            shortcut_neg = shortcut_neg.detach()
+
+        return causal_pos - shortcut_pos, causal_neg - shortcut_neg
+
     def causal_training_step(self, data_pos, data_neg):
         outputs_pos = self.graph_classifier(data_pos, mode='all')
         outputs_neg = self.graph_classifier(data_neg, mode='all')
 
         original_loss = self.ranking_loss(outputs_pos['original'], outputs_neg['original'])
         causal_loss = self.ranking_loss(outputs_pos['causal'], outputs_neg['causal'])
-        effect_loss = self.ranking_loss(outputs_pos['effect'], outputs_neg['effect'])
+        effect_pos, effect_neg = self.effect_scores_for_loss(outputs_pos, outputs_neg)
+        effect_loss = self.ranking_loss(effect_pos, effect_neg)
         mask_reg_loss, mask_stats = self.mask_regularization(outputs_pos, outputs_neg)
         shortcut_loss = self.shortcut_penalty(outputs_pos, outputs_neg)
         effect_loss_weight, effect_loss_ramp_factor = self.current_effect_loss_weight()
