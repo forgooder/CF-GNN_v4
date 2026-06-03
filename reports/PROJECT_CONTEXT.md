@@ -640,6 +640,37 @@ CUDA_VISIBLE_DEVICES=1 nohup python -u train.py -d WN18RR_v1 -e causal_v5_wn18rr
   > causal_v5_wn18rr_v1_causal_select.log 2>&1 &
 ```
 
+### Formal Status: 2026-06-03 08:18 CST
+
+`causal_v5_wn18rr_v1_original_select` has been evaluated on WN18RR_v1 test set. Best AUC-PR among tested score modes was `causal_plus_effect`:
+
+```text
+AUC 0.9315
+AUC-PR 0.9293
+MRR 0.6989
+Hits@1 0.6411
+Hits@5 0.7641
+Hits@10 0.7727
+```
+
+This is below the recorded same-environment WN18RR_v1 GRAIL baseline:
+
+```text
+baseline AUC-PR 0.9350
+baseline Hits@10 0.8404
+```
+
+Mask health was poor by epoch 100:
+
+```text
+causal_mask_raw_mean 0.8939
+shortcut_mask_raw_mean 0.0084
+causal_mask_entropy 0.0188
+shortcut_mask_entropy 0.0146
+```
+
+Conclusion: the first formal v5 WN18RR_v1 original-selection configuration is a negative result. It does not beat the same-environment baseline and does not prevent late shortcut-mask collapse. Next WN18RR_v1 work should prioritize anti-collapse changes or stronger beta preservation before broad dataset expansion.
+
 ## 13. Training Log Checks
 
 ```bash
