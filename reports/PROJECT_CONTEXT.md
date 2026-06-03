@@ -2437,3 +2437,71 @@ Next action:
 ```text
 Proceed to a longer validation-only nell_v1 diagnostic, still without test-set evaluation. Use the same logit-L2 causal-only setup first to establish whether the initially healthy mask state persists beyond the smoke epoch.
 ```
+
+## 40. nell_v1 Logit-L2 Causal-Only 10 Epoch Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d nell_v1 -e diag_v5_nell_v1_logit_l2_causal_only_10ep \
+  --use_causal_training \
+  --num_epochs 10 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC 0.9095
+best validation AUC-PR 0.9190
+```
+
+Mask checkpoints:
+
+```text
+epoch1 raw causal=0.5456
+epoch1 raw shortcut=0.4248
+epoch1 entropy causal=0.4053
+epoch1 entropy shortcut=0.6797
+epoch1 budget_loss=0.1250
+epoch1 mask_logit_l2_loss=7.7372
+
+epoch7 raw causal=0.7446
+epoch7 raw shortcut=0.4099
+epoch7 entropy causal=0.1131
+epoch7 entropy shortcut=0.6747
+epoch7 budget_loss=0.2474
+epoch7 mask_logit_l2_loss=46.5492
+
+epoch10 raw causal=0.7911
+epoch10 raw shortcut=0.4062
+epoch10 entropy causal=0.1237
+epoch10 entropy shortcut=0.6736
+epoch10 budget_loss=0.2480
+epoch10 overlap_loss=0.3128
+epoch10 mask_logit_l2_loss=62.3997
+epoch10 weight_norm=261.4663
+```
+
+Conclusion:
+
+```text
+Mixed/negative mask diagnostic. Validation AUC-PR improves to 0.9190, but alpha hardens over training even with effect_loss_weight=0.0. Beta remains healthy: raw shortcut stays around 0.40-0.43 and shortcut entropy stays around 0.67. Alpha drifts open and low-entropy: raw causal reaches 0.7911 with entropy 0.1237 by epoch10.
+```
+
+Next action:
+
+```text
+Do not run test evaluation. For NELL_v1, logit L2 plus causal-only loss is not enough to keep alpha healthy beyond a short smoke. Next diagnostic should target alpha directly, for example a stronger causal-mask budget/logit penalty, staged mask freezing, or a dedicated alpha entropy floor before considering formal evaluation.
+```
