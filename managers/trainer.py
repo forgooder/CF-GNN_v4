@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from sklearn import metrics
-from utils.score_utils import select_score
+from utils.score_utils import SCORE_MODE_CHOICES, select_score
 
 
 class Trainer():
@@ -307,6 +307,9 @@ class Trainer():
                 tic = time.time()
                 result = self.valid_evaluator.eval()
                 logging.info('\nPerformance:' + str(result) + 'in ' + str(time.time() - tic))
+                if getattr(self.params, 'log_all_score_modes_validation', False):
+                    all_mode_result = self.valid_evaluator.eval_score_modes(SCORE_MODE_CHOICES)
+                    logging.info('\nValidation all score modes:' + str(all_mode_result))
 
                 selection_metric = getattr(self.params, 'selection_metric', 'auc')
                 current_metric = result[selection_metric]

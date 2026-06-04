@@ -1,4 +1,4 @@
-SCORE_MODE_CHOICES = ['original', 'causal', 'effect', 'causal_plus_effect']
+SCORE_MODE_CHOICES = ['original', 'causal', 'shortcut', 'effect', 'causal_plus_effect']
 
 
 def select_score(model_output, score_mode='original'):
@@ -9,6 +9,8 @@ def select_score(model_output, score_mode='original'):
         return model_output['original']
     if score_mode == 'causal':
         return model_output['causal']
+    if score_mode == 'shortcut':
+        return model_output['shortcut']
     if score_mode == 'effect':
         return model_output['effect']
     if score_mode == 'causal_plus_effect':

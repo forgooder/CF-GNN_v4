@@ -3027,3 +3027,67 @@ Next action:
 ```text
 Pause WN18RR_v1 direct scalar sweeps. The next useful code improvement is a default-off validation diagnostic that evaluates all score modes from one checkpoint/pass, so future runs can compare original/causal/shortcut/effect/causal_plus_effect without separate training runs. This does not change metric formulas or baseline behavior.
 ```
+
+## 49. 2026-06-04 All Score-Mode Validation Diagnostic
+
+Code change:
+
+```text
+Added --log_all_score_modes_validation, default off.
+Added missing shortcut score mode to SCORE_MODE_CHOICES/select_score.
+```
+
+Behavior:
+
+```text
+When --log_all_score_modes_validation is enabled, validation logs AUC/AUC-PR for original, causal, shortcut, effect, and causal_plus_effect from mode='all' outputs. This diagnostic does not affect checkpoint selection, early stopping, metric formulas, or baseline default behavior.
+```
+
+Smoke:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e smoke_v5_all_score_modes_validation \
+  --gpu 0 \
+  --use_causal_training \
+  --num_epochs 1 \
+  --batch_size 4 \
+  --causal_loss_weight 0.5 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 \
+  --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect \
+  --selection_metric auc_pr \
+  --log_all_score_modes_validation
+```
+
+Second validation point:
+
+```text
+original AUC/AUC-PR 0.9362/0.9437
+causal AUC/AUC-PR 0.9089/0.9310
+shortcut AUC/AUC-PR 0.9071/0.9218
+effect AUC/AUC-PR 0.7314/0.8325
+causal_plus_effect AUC/AUC-PR 0.9085/0.9305
+```
+
+Mask health:
+
+```text
+epoch1 raw=0.5137/0.4274
+epoch1 entropy=0.5162/0.6812
+epoch1 budget=0.0803
+epoch1 overlap=0.2140
+```
+
+Interpretation:
+
+```text
+This is only a smoke result, but it shows that the original scorer inside Causal-GraIL training can outperform causal/effect score modes and can exceed the WN18RR_v1 same-env baseline validation AUC-PR. The next formal validation-only run should select by original AUC-PR and keep all-mode logging enabled.
+```

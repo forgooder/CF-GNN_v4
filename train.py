@@ -149,6 +149,8 @@ if __name__ == '__main__':
                         help="Score used for validation and training AUC logging")
     parser.add_argument("--selection_metric", type=str, choices=['auc', 'auc_pr'], default='auc',
                         help="Validation metric used to save the best checkpoint; default preserves existing AUC selection")
+    parser.add_argument("--log_all_score_modes_validation", action='store_true',
+                        help="Log validation AUC/AUC-PR for every score mode; default off and does not affect checkpoint selection")
 
     # Data processing pipeline params
     parser.add_argument("--max_links", type=int, default=1000000,

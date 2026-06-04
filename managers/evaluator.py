@@ -5,7 +5,7 @@ import pdb
 from sklearn import metrics
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from utils.score_utils import forward_for_score
+from utils.score_utils import forward_for_score, select_score
 
 
 class Evaluator():
@@ -60,3 +60,41 @@ class Evaluator():
                     f.write('\t'.join([s, r, o, str(score)]) + '\n')
 
         return {'auc': auc, 'auc_pr': auc_pr}
+
+    def eval_score_modes(self, score_modes):
+        mode_scores = {
+            score_mode: {
+                'pos_scores': [],
+                'neg_scores': [],
+                'pos_labels': [],
+                'neg_labels': []
+            }
+            for score_mode in score_modes
+        }
+        dataloader = DataLoader(self.data, batch_size=self.params.batch_size, shuffle=False, num_workers=self.params.num_workers, collate_fn=self.params.collate_fn)
+
+        self.graph_classifier.eval()
+        with torch.no_grad():
+            for b_idx, batch in enumerate(dataloader):
+                data_pos, targets_pos, data_neg, targets_neg = self.params.move_batch_to_device(batch, self.params.device)
+                outputs_pos = self.graph_classifier(data_pos, mode='all')
+                outputs_neg = self.graph_classifier(data_neg, mode='all')
+
+                for score_mode, scores in mode_scores.items():
+                    score_pos = select_score(outputs_pos, score_mode)
+                    score_neg = select_score(outputs_neg, score_mode)
+                    scores['pos_scores'] += score_pos.view(-1).detach().cpu().tolist()
+                    scores['neg_scores'] += score_neg.view(-1).detach().cpu().tolist()
+                    scores['pos_labels'] += targets_pos.tolist()
+                    scores['neg_labels'] += targets_neg.tolist()
+
+        results = {}
+        for score_mode, scores in mode_scores.items():
+            labels = scores['pos_labels'] + scores['neg_labels']
+            predicted_scores = scores['pos_scores'] + scores['neg_scores']
+            results[score_mode] = {
+                'auc': metrics.roc_auc_score(labels, predicted_scores),
+                'auc_pr': metrics.average_precision_score(labels, predicted_scores)
+            }
+
+        return results
