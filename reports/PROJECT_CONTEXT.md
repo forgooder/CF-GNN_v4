@@ -3981,3 +3981,26 @@ CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_caus
   --score_mode original --selection_metric auc_pr \
   --log_all_score_modes_validation --log_relation_metrics_validation
 ```
+
+Result:
+
+```text
+Experiment: diag_v5_wn18rr_v1_causal_warmup3_ramp3_original_w05_8ep
+Best validation original AUC/AUC-PR: 0.9103/0.9165
+No test run.
+```
+
+Mask:
+
+```text
+epoch1 causal_loss_weight=0.0 raw=0.4554/0.4318 entropy=0.6889/0.6836
+epoch3 causal_loss_weight=0.0 raw=0.4546/0.4323 entropy=0.6890/0.6840
+epoch6 causal_loss_weight=0.5 raw=0.6082/0.4208 entropy=0.4427/0.6794 budget=0.1206 overlap=0.2511
+epoch8 causal_loss_weight=0.5 raw=0.6473/0.4184 entropy=0.5435/0.6792 budget=0.0843 overlap=0.2750
+```
+
+Conclusion:
+
+```text
+Negative validation result. Warmup/ramp does not rescue WN18RR_v1 original AUC-PR and does not improve weak relations. It confirms that v5 can keep masks non-collapsed while still failing WN relation families. Do not run test for this config. Next WN work should inspect or change relation-specific scoring/objectives for _hypernym and _has_part; avoid more global mask scalar sweeps unless tied to a concrete relation-level hypothesis.
+```
