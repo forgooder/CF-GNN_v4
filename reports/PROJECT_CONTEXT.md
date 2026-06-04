@@ -3580,3 +3580,65 @@ Updated overall judgment:
 ```text
 NELL_v1 and FB237_v1 each now have one positive formal validation-selected test plus one positive validation-only repeat. WN18RR_v1/v2/v4 remain negative despite improved mask health. Current v5 evidence supports dataset-dependent gains: strong on NELL/FB237, weak on WN18RR. Further WN18RR progress likely needs an objective or architecture change, while additional NELL/FB237 tests should be avoided for this exact configuration.
 ```
+
+## 57. 2026-06-04 WN18RR_v1 Shortcut-Penalty Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_shortcut_penalty01_original_w05_8ep \
+  --gpu 0 \
+  --use_causal_training \
+  --num_epochs 8 \
+  --batch_size 16 \
+  --causal_loss_weight 0.5 \
+  --effect_loss_weight 0.0 \
+  --shortcut_penalty_weight 0.1 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 \
+  --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode original \
+  --selection_metric auc_pr \
+  --log_all_score_modes_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.9035/0.9123
+```
+
+All-mode snapshot at best saved point:
+
+```text
+original AUC/AUC-PR 0.9035/0.9123
+causal AUC/AUC-PR 0.9038/0.9125
+shortcut AUC/AUC-PR 0.9016/0.9042
+effect AUC/AUC-PR 0.8713/0.8949
+causal_plus_effect AUC/AUC-PR 0.9043/0.9141
+```
+
+Mask health:
+
+```text
+epoch2 raw=0.8169/0.6599 entropy=0.3795/0.2926 overlap=0.5533
+epoch8 raw=0.5499/0.5525 entropy=0.5381/0.2817 overlap=0.3408
+```
+
+Conclusion:
+
+```text
+Negative diagnostic. The shortcut penalty does not solve WN18RR_v1 and appears to push shortcut raw masks and overlap upward rather than producing a cleaner split. Validation AUC-PR 0.9123 is below the no-penalty WN18RR_v1 diagnostics and far below same-env baseline 0.9350. Do not test or expand this configuration.
+```
+
+Updated WN18RR judgment:
+
+```text
+WN18RR remains the hard negative case. Existing default-off shortcut score suppression is not enough and moves mask overlap in the wrong direction. The next WN18RR work should inspect whether auxiliary masked losses should have reduced or separated gradients into the shared scorer/GNN, instead of adding stronger shortcut penalties.
+```
