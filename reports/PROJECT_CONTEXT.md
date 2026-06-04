@@ -3454,3 +3454,66 @@ Updated overall judgment:
 ```text
 The current v5 mainline is effective on NELL_v1 and FB237_v1 under formal validation-selected tests, and ineffective on WN18RR_v1/v2/v4 so far. It does mitigate v4 mask collapse across datasets. The next priority is a stability repeat for NELL_v1 or FB237_v1 without using test feedback for tuning, plus a structural rethink for WN18RR rather than more scalar sweeps.
 ```
+
+## 55. 2026-06-04 FB237_v1 Validation-Only Stability Repeat
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d fb237_v1 -e repeat_v5_fb237_v1_original_score_w05_allmodes_10ep_lc \
+  --gpu 0 \
+  --use_causal_training \
+  --num_epochs 10 \
+  --batch_size 16 \
+  --causal_loss_weight 0.5 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 \
+  --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode original \
+  --selection_metric auc_pr \
+  --log_all_score_modes_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.8504/0.8683
+```
+
+All-mode snapshot at best validation point:
+
+```text
+original AUC/AUC-PR 0.8504/0.8683
+causal AUC/AUC-PR 0.8459/0.8650
+shortcut AUC/AUC-PR 0.8625/0.8875
+effect AUC/AUC-PR 0.6141/0.6914
+causal_plus_effect AUC/AUC-PR 0.8228/0.8351
+```
+
+Mask health:
+
+```text
+epoch6 raw=0.5768/0.4231 entropy=0.3222/0.6797 budget=0.1583 overlap=0.2382
+epoch10 raw=0.6666/0.4166 entropy=0.4127/0.6781 budget=0.1339 overlap=0.2758
+```
+
+No test was run.
+
+Conclusion:
+
+```text
+Positive validation-only stability repeat. Although the first validation point was weak, later AUC-PR values recovered to 0.8592, 0.8578, and best 0.8683, all above the same-env FB237_v1 baseline AUC-PR 0.8349. This strengthens confidence that the formal FB237_v1 win was not a single-run validation artifact. Shortcut diagnostic scoring is especially strong, so the current mechanism may act more as useful mask regularization/ensemble behavior than clean causal separation on this dataset.
+```
+
+Updated overall judgment:
+
+```text
+FB237_v1 now has one positive formal test and one positive validation-only repeat. NELL_v1 has one positive formal test but still needs a comparable validation-only repeat. WN18RR_v1/v2/v4 remain negative despite healthy masks. The next experiment should be a NELL_v1 validation-only repeat with the same current mainline configuration, not another FB237_v1 test.
+```
