@@ -1,6 +1,6 @@
 # Causal-GraIL v5 Consolidated Experiment Report
 
-Updated: 2026-06-04 19:56 CST
+Updated: 2026-06-04 20:03 CST
 
 ## Scope
 
@@ -231,6 +231,23 @@ Interpretation:
 
 ```text
 WN18RR_v1 aggregate failure is concentrated in relation families where GraIL-style enclosing subgraphs are likely ambiguous for hierarchy/part-whole reasoning, especially _hypernym and _has_part. Current v5 mask regularization keeps masks healthy but does not repair these relation-specific ranking failures.
+```
+
+Relation-aware budget diagnostic:
+
+```text
+Config: configs/wn18rr_v1_weak_relation_budget.json
+Experiment: diag_v5_wn18rr_v1_relation_budget_weak065035_original_w05_8ep
+Budget: _hypernym and _has_part causal target 0.65, shortcut target 0.35; other relations default 0.45/0.45
+Best validation original AUC/AUC-PR: 0.9117/0.9169
+No test run.
+Final mask: raw=0.5649/0.4066, entropy=0.6263/0.6742, budget=0.0283, overlap=0.2250
+```
+
+Conclusion:
+
+```text
+This relation-aware budget is negative. It does not improve aggregate WN18RR_v1 validation and does not reliably repair _hypernym or _has_part. The next relation-aware attempt should not simply force weak relations to larger causal masks; it needs either per-relation diagnostics of mask means or a different relation-specific objective.
 ```
 
 ## Files Kept After Consolidation

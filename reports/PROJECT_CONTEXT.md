@@ -3858,3 +3858,56 @@ Conclusion:
 ```text
 Negative validation result, but useful diagnosis. The aggregate WN18RR_v1 gap is concentrated in _hypernym and _has_part, not uniformly across relations. Masks are healthy, so the next WN18RR step should be relation-aware objective/budget design or relation-specific analysis, not another global mask scalar sweep. Do not test.
 ```
+
+## 62. 2026-06-04 WN18RR_v1 Weak-Relation Budget Diagnostic
+
+Budget config:
+
+```text
+configs/wn18rr_v1_weak_relation_budget.json
+causal:   relation 0 (_hypernym) = 0.65, relation 4 (_has_part) = 0.65
+shortcut: relation 0 (_hypernym) = 0.35, relation 4 (_has_part) = 0.35
+all other relations use default 0.45/0.45
+```
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_relation_budget_weak065035_original_w05_8ep \
+  --gpu 0 --use_causal_training --num_epochs 8 --batch_size 16 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --relation_budget_path configs/wn18rr_v1_weak_relation_budget.json \
+  --score_mode original --selection_metric auc_pr \
+  --log_all_score_modes_validation --log_relation_metrics_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.9117/0.9169
+```
+
+Relation observations:
+
+```text
+_hypernym AUC-PR stayed around 0.69-0.71
+_has_part fluctuated and did not reliably improve
+strong relations remained strong but did not compensate
+```
+
+Mask:
+
+```text
+epoch4 raw=0.7313/0.3924 entropy=0.3987/0.6661 budget=0.1144 overlap=0.2778
+epoch8 raw=0.5649/0.4066 entropy=0.6263/0.6742 budget=0.0283 overlap=0.2250
+```
+
+Conclusion:
+
+```text
+Negative validation result. Forcing weak WN18RR relations toward larger causal and smaller shortcut masks does not improve aggregate validation or reliably repair _hypernym/_has_part. Do not test. Next WN work should log per-relation mask means or redesign the relation-specific objective instead of guessing relation budgets.
+```
