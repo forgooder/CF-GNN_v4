@@ -3517,3 +3517,66 @@ Updated overall judgment:
 ```text
 FB237_v1 now has one positive formal test and one positive validation-only repeat. NELL_v1 has one positive formal test but still needs a comparable validation-only repeat. WN18RR_v1/v2/v4 remain negative despite healthy masks. The next experiment should be a NELL_v1 validation-only repeat with the same current mainline configuration, not another FB237_v1 test.
 ```
+
+## 56. 2026-06-04 NELL_v1 Validation-Only Stability Repeat
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d nell_v1 -e repeat_v5_nell_v1_original_score_w05_allmodes_10ep \
+  --gpu 0 \
+  --use_causal_training \
+  --num_epochs 10 \
+  --batch_size 16 \
+  --causal_loss_weight 0.5 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 \
+  --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode original \
+  --selection_metric auc_pr \
+  --log_all_score_modes_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.9009/0.9175
+```
+
+All-mode snapshot at best validation point:
+
+```text
+original AUC/AUC-PR 0.9009/0.9175
+causal AUC/AUC-PR 0.9087/0.9206
+shortcut AUC/AUC-PR 0.9049/0.9197
+effect AUC/AUC-PR 0.3954/0.5430
+causal_plus_effect AUC/AUC-PR 0.9081/0.9199
+```
+
+Mask health:
+
+```text
+epoch6 raw=0.6623/0.4156 entropy=0.2954/0.6772 budget=0.1794 overlap=0.2618
+epoch10 raw=0.6923/0.4145 entropy=0.3321/0.6770 budget=0.1677 overlap=0.2725
+```
+
+No test was run.
+
+Conclusion:
+
+```text
+Positive validation-only stability repeat. The repeat is weaker than the formal NELL_v1 validation/test run but still comfortably exceeds same-env and paper AUC-PR targets at every validation point. Shortcut masks remain healthy; causal raw is moderately high late, but entropy does not collapse to the v4 failure band.
+```
+
+Updated overall judgment:
+
+```text
+NELL_v1 and FB237_v1 each now have one positive formal validation-selected test plus one positive validation-only repeat. WN18RR_v1/v2/v4 remain negative despite improved mask health. Current v5 evidence supports dataset-dependent gains: strong on NELL/FB237, weak on WN18RR. Further WN18RR progress likely needs an objective or architecture change, while additional NELL/FB237 tests should be avoided for this exact configuration.
+```
