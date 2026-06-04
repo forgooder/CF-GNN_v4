@@ -1,6 +1,6 @@
 # Causal-GraIL v5 Consolidated Experiment Report
 
-Updated: 2026-06-04 21:35 CST
+Updated: 2026-06-04 22:05 CST
 
 ## Scope
 
@@ -39,6 +39,8 @@ Important default-off additions now available:
 --log_relation_mask_validation
 --relation_overlap_penalty_path
 --relation_overlap_penalty_weight
+--relation_shortcut_floor_path
+--relation_shortcut_floor_weight
 ```
 
 Baseline path remains default-preserving: causal training is only active with `--use_causal_training`, and new parameters are default-off or default-compatible.
@@ -557,6 +559,65 @@ Conclusion:
 
 ```text
 Negative validation result. The relation-overlap penalty can reduce overlap for selected weak relations, but at weight 0.05 it often does so by suppressing shortcut masks and lowering shortcut entropy, which is a new mask-health failure. It does not improve aggregate WN18RR_v1 validation beyond the prior mainline and remains below same-env AUC-PR 0.9350. Do not test. Future WN work should not use this exact penalty; if revisited, it needs a floor-preserving formulation that penalizes high overlap without pushing shortcut raw toward zero.
+```
+
+## Code Review Update: Relation Shortcut Floor
+
+Code change:
+
+```text
+Added default-off --relation_shortcut_floor_path and --relation_shortcut_floor_weight.
+The JSON maps relation ids or names to shortcut raw-mask floors. The loss is a weighted average of relu(floor - shortcut_raw)^2 on selected target relations.
+Added configs/wn18rr_v1_weak_relation_shortcut_floor.json with floor 0.35 for _hypernym and _has_part.
+Default behavior is unchanged because the path is empty and weight is 0.0 by default.
+```
+
+Verification:
+
+```bash
+python -m py_compile train.py managers/trainer.py
+python train.py --help | rg "relation_shortcut_floor|relation_overlap_penalty"
+```
+
+Smoke:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e smoke_v5_relation_overlap_floor \
+  --gpu 0 --use_causal_training --num_epochs 1 --batch_size 4 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --relation_overlap_penalty_path configs/wn18rr_v1_weak_relation_overlap.json \
+  --relation_overlap_penalty_weight 0.03 \
+  --relation_shortcut_floor_path configs/wn18rr_v1_weak_relation_shortcut_floor.json \
+  --relation_shortcut_floor_weight 0.1 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --log_relation_metrics_validation --log_relation_mask_validation
+```
+
+Smoke result:
+
+```text
+Best validation original AUC/AUC-PR: 0.9228/0.9256
+No test run.
+Final relation_overlap_loss=0.0992, relation_shortcut_floor_loss=0.0010
+Final global raw=0.4582/0.3950 entropy=0.5778/0.6663
+```
+
+Relation mask observations:
+
+```text
+At best validation:
+_hypernym shortcut_raw=0.3741, shortcut_entropy=0.6593, overlap=0.1325
+_has_part shortcut_raw=0.3965, shortcut_entropy=0.6710, overlap=0.1520
+```
+
+Conclusion:
+
+```text
+Smoke passed. The shortcut floor prevents the relation-overlap penalty from collapsing weak-relation shortcut masks and reaches a stronger WN18RR_v1 smoke AUC-PR than the previous overlap-only diagnostic. It is still below same-env baseline AUC-PR 0.9350, so it requires validation-only follow-up before any test run.
 ```
 
 ## Files Kept After Consolidation

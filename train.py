@@ -157,6 +157,10 @@ if __name__ == '__main__':
                         help="Optional JSON file with relation weights for extra overlap penalty")
     parser.add_argument("--relation_overlap_penalty_weight", type=float, default=0.0,
                         help="Weight for relation-specific raw causal-shortcut overlap penalty")
+    parser.add_argument("--relation_shortcut_floor_path", type=str, default='',
+                        help="Optional JSON file with relation-specific shortcut raw mask floors")
+    parser.add_argument("--relation_shortcut_floor_weight", type=float, default=0.0,
+                        help="Weight for relation-specific shortcut raw mask floor penalty")
     parser.add_argument("--score_mode", type=str, choices=SCORE_MODE_CHOICES, default='original',
                         help="Score used for validation and training AUC logging")
     parser.add_argument("--selection_metric", type=str, choices=['auc', 'auc_pr'], default='auc',

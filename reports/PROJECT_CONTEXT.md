@@ -4146,3 +4146,56 @@ Conclusion:
 ```text
 Negative validation result. The penalty lowers selected relation overlap but often by suppressing shortcut masks, creating a new relation-level mask-health failure. It does not beat same-env WN18RR_v1 baseline. Do not test this config. Do not continue this exact penalty unless redesigned with shortcut-floor preservation.
 ```
+
+## 67. 2026-06-04 Relation Shortcut Floor
+
+Code change:
+
+```text
+Added --relation_shortcut_floor_path
+Added --relation_shortcut_floor_weight
+Added configs/wn18rr_v1_weak_relation_shortcut_floor.json with shortcut floor 0.35 for relation 0 (_hypernym) and relation 4 (_has_part)
+Default off. Does not affect baseline or causal runs unless explicitly enabled.
+```
+
+Smoke:
+
+```text
+Experiment: smoke_v5_relation_overlap_floor
+Best validation original AUC/AUC-PR: 0.9228/0.9256
+No test run.
+Final relation_overlap_loss=0.0992
+Final relation_shortcut_floor_loss=0.0010
+Final global raw=0.4582/0.3950 entropy=0.5778/0.6663
+```
+
+Best-point relation mask:
+
+```text
+_hypernym shortcut_raw=0.3741, shortcut_entropy=0.6593, overlap=0.1325
+_has_part shortcut_raw=0.3965, shortcut_entropy=0.6710, overlap=0.1520
+```
+
+Conclusion:
+
+```text
+Smoke passed. Shortcut floor prevents the relation-overlap penalty from collapsing weak-relation shortcut masks. Validation remains below same-env WN18RR_v1 baseline, so this needs validation-only follow-up before any test.
+```
+
+Next command:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_relation_overlap_floor_original_w05_8ep \
+  --gpu 0 --use_causal_training --num_epochs 8 --batch_size 16 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --relation_overlap_penalty_path configs/wn18rr_v1_weak_relation_overlap.json \
+  --relation_overlap_penalty_weight 0.03 \
+  --relation_shortcut_floor_path configs/wn18rr_v1_weak_relation_shortcut_floor.json \
+  --relation_shortcut_floor_weight 0.1 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --log_all_score_modes_validation --log_relation_metrics_validation --log_relation_mask_validation
+```
