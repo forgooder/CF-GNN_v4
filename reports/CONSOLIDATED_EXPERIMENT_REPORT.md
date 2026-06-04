@@ -1,6 +1,6 @@
 # Causal-GraIL v5 Consolidated Experiment Report
 
-Updated: 2026-06-04 21:13 CST
+Updated: 2026-06-04 21:23 CST
 
 ## Scope
 
@@ -37,6 +37,8 @@ Important default-off additions now available:
 --masked_aux_gradient_mode {full,mask_only}
 --log_relation_metrics_validation
 --log_relation_mask_validation
+--relation_overlap_penalty_path
+--relation_overlap_penalty_weight
 ```
 
 Baseline path remains default-preserving: causal training is only active with `--use_causal_training`, and new parameters are default-off or default-compatible.
@@ -456,6 +458,63 @@ Conclusion:
 
 ```text
 Negative validation result. Relation-mask logging confirms v5 no longer has global v4-style collapse, but WN weak relation families still fail. _hypernym and _has_part often show higher causal raw and overlap than strong relations, so forcing larger causal budgets is not the right direction. The next WN attempt should either penalize weak-relation overlap/high causal saturation, or introduce relation-family-specific scoring/objective changes; do not run test for this configuration.
+```
+
+## Code Review Update: Relation-Specific Overlap Penalty
+
+Code change:
+
+```text
+Added default-off --relation_overlap_penalty_path and --relation_overlap_penalty_weight.
+The JSON maps relation ids or names to overlap multipliers. The loss is a weighted average of raw causal*shortcut overlap on selected target relations, then scaled by relation_overlap_penalty_weight.
+Added configs/wn18rr_v1_weak_relation_overlap.json for _hypernym and _has_part.
+Default behavior is unchanged because the weight is 0.0 and the path is empty by default.
+```
+
+Verification:
+
+```bash
+python -m py_compile train.py managers/trainer.py
+python train.py --help | rg "relation_overlap_penalty"
+```
+
+Smoke:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e smoke_v5_relation_overlap_penalty \
+  --gpu 0 --use_causal_training --num_epochs 1 --batch_size 4 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --relation_overlap_penalty_path configs/wn18rr_v1_weak_relation_overlap.json \
+  --relation_overlap_penalty_weight 0.05 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --log_relation_metrics_validation --log_relation_mask_validation
+```
+
+Smoke result:
+
+```text
+Best validation original AUC/AUC-PR: 0.9217/0.9217
+No test run.
+Final epoch relation_overlap_loss=0.0460
+Final global raw=0.4910/0.3590 entropy=0.4934/0.6142
+```
+
+Initial observation:
+
+```text
+The penalty strongly reduced selected weak-relation overlap in smoke.
+_has_part AUC-PR reached 0.8743 at a later validation point, much higher than prior relation diagnostics.
+_hypernym remained weak around AUC-PR 0.699, and aggregate AUC-PR fell at the later validation point.
+```
+
+Conclusion:
+
+```text
+Smoke passed. Relation-specific overlap penalty is a plausible local tool for _has_part but does not solve _hypernym in smoke. It needs validation-only follow-up before any test run.
 ```
 
 ## Files Kept After Consolidation

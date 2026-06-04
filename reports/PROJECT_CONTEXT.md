@@ -4077,3 +4077,46 @@ Conclusion:
 ```text
 Negative validation result. WN weak relations remain poor despite non-collapsed global masks. Larger causal masks are not sufficient; weak relations often already have larger causal raw and overlap than strong relations. Next WN change should test weak-relation overlap/high-causal saturation penalties, or a relation-family-specific objective/scorer. Do not run test for this configuration.
 ```
+
+## 66. 2026-06-04 Relation-Specific Overlap Penalty
+
+Code change:
+
+```text
+Added --relation_overlap_penalty_path
+Added --relation_overlap_penalty_weight
+Added configs/wn18rr_v1_weak_relation_overlap.json selecting relation 0 (_hypernym) and relation 4 (_has_part)
+Default off. Does not affect baseline or causal runs unless explicitly enabled.
+```
+
+Smoke:
+
+```text
+Experiment: smoke_v5_relation_overlap_penalty
+Best validation original AUC/AUC-PR: 0.9217/0.9217
+No test run.
+Final relation_overlap_loss=0.0460
+Final global raw=0.4910/0.3590 entropy=0.4934/0.6142
+```
+
+Observation:
+
+```text
+The penalty reduced selected weak-relation overlap. _has_part AUC-PR reached 0.8743 at a later validation point, but _hypernym stayed weak around 0.699 and aggregate validation later fell. This is a useful local mechanism, not a full WN fix.
+```
+
+Next command:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_relation_overlap_w005_original_w05_8ep \
+  --gpu 0 --use_causal_training --num_epochs 8 --batch_size 16 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --relation_overlap_penalty_path configs/wn18rr_v1_weak_relation_overlap.json \
+  --relation_overlap_penalty_weight 0.05 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --log_all_score_modes_validation --log_relation_metrics_validation --log_relation_mask_validation
+```

@@ -153,6 +153,10 @@ if __name__ == '__main__':
                         help="Default target ratio for raw shortcut masks in budget loss")
     parser.add_argument("--relation_budget_path", type=str, default='',
                         help="Optional JSON file with relation-aware causal/shortcut mask target ratios")
+    parser.add_argument("--relation_overlap_penalty_path", type=str, default='',
+                        help="Optional JSON file with relation weights for extra overlap penalty")
+    parser.add_argument("--relation_overlap_penalty_weight", type=float, default=0.0,
+                        help="Weight for relation-specific raw causal-shortcut overlap penalty")
     parser.add_argument("--score_mode", type=str, choices=SCORE_MODE_CHOICES, default='original',
                         help="Score used for validation and training AUC logging")
     parser.add_argument("--selection_metric", type=str, choices=['auc', 'auc_pr'], default='auc',

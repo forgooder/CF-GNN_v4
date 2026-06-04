@@ -31,6 +31,7 @@ class Trainer():
         if self.use_causal_training and hasattr(self.graph_classifier, '_get_causal_mask_generator'):
             self.graph_classifier._get_causal_mask_generator(params.device)
         self.relation_budget = self.load_relation_budget()
+        self.relation_overlap_penalty = self.load_relation_overlap_penalty()
 
         model_params = list(self.graph_classifier.parameters())
         logging.info('Total number of parameters: %d' % sum(map(lambda x: x.numel(), model_params)))
@@ -74,6 +75,25 @@ class Trainer():
             'shortcut': normalize_budget('shortcut')
         }
 
+    def load_relation_overlap_penalty(self):
+        relation_overlap_penalty_path = getattr(self.params, 'relation_overlap_penalty_path', '')
+        if not relation_overlap_penalty_path:
+            return {}
+
+        with open(relation_overlap_penalty_path) as f:
+            raw_penalty = json.load(f)
+
+        relation2id = getattr(self.graph_classifier, 'relation2id', {})
+        raw_overlap = raw_penalty.get('overlap', raw_penalty)
+        penalty = {}
+        for key, value in raw_overlap.items():
+            if key in relation2id:
+                rel_id = relation2id[key]
+            else:
+                rel_id = int(key)
+            penalty[int(rel_id)] = float(value)
+        return penalty
+
     def ranking_loss(self, score_pos, score_neg):
         score_pos = score_pos.view(-1)
         score_neg = score_neg.view(len(score_pos), -1).mean(dim=1)
@@ -90,6 +110,16 @@ class Trainer():
             )
         return targets
 
+    def relation_mask_values(self, target_rel_labels, value_map):
+        values = torch.zeros_like(target_rel_labels.float(), device=self.params.device)
+        for rel_id, value in value_map.items():
+            values = torch.where(
+                target_rel_labels == int(rel_id),
+                torch.full_like(values, float(value)),
+                values
+            )
+        return values
+
     def mask_regularization(self, outputs_pos, outputs_neg):
         mask_sparsity_weight = getattr(self.params, 'mask_sparsity_weight', 0.0)
         mask_entropy_weight = getattr(self.params, 'mask_entropy_weight', 0.0)
@@ -100,6 +130,7 @@ class Trainer():
         causal_logit_l2_weight = getattr(self.params, 'causal_mask_logit_l2_weight', 0.0)
         mask_budget_weight = getattr(self.params, 'mask_budget_weight', 0.0)
         mask_overlap_weight = getattr(self.params, 'mask_overlap_weight', 0.0)
+        relation_overlap_penalty_weight = getattr(self.params, 'relation_overlap_penalty_weight', 0.0)
 
         causal_masks = torch.cat([
             outputs_pos['causal_raw_mask'].view(-1),
@@ -143,6 +174,9 @@ class Trainer():
             + F.mse_loss(shortcut_masks, shortcut_targets)
         )
         overlap_loss = (causal_masks * shortcut_masks).mean()
+        relation_overlap_weights = self.relation_mask_values(target_rel_labels, self.relation_overlap_penalty)
+        relation_overlap_denom = relation_overlap_weights.sum().clamp_min(1.0)
+        relation_overlap_loss = (relation_overlap_weights * causal_masks * shortcut_masks).sum() / relation_overlap_denom
         entropy_floor = torch.tensor(float(mask_entropy_floor), device=self.params.device)
         entropy_floor_loss = (
             torch.relu(entropy_floor - causal_entropy).pow(2)
@@ -156,6 +190,7 @@ class Trainer():
             legacy_reg
             + mask_budget_weight * budget_loss
             + mask_overlap_weight * overlap_loss
+            + relation_overlap_penalty_weight * relation_overlap_loss
             + mask_entropy_floor_weight * entropy_floor_loss
             + mask_logit_l2_weight * logit_l2_loss
             + causal_entropy_floor_weight * causal_entropy_floor_loss
@@ -170,6 +205,7 @@ class Trainer():
             'shortcut_mask_entropy': shortcut_entropy.item(),
             'mask_budget_loss': budget_loss.item(),
             'mask_overlap_loss': overlap_loss.item(),
+            'relation_overlap_loss': relation_overlap_loss.item(),
             'mask_entropy_floor_loss': entropy_floor_loss.item(),
             'mask_logit_l2_loss': logit_l2_loss.item(),
             'causal_mask_entropy_floor_loss': causal_entropy_floor_loss.item(),
