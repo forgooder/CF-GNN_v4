@@ -1,6 +1,6 @@
 # Causal-GraIL v5 Consolidated Experiment Report
 
-Updated: 2026-06-04 21:23 CST
+Updated: 2026-06-04 21:35 CST
 
 ## Scope
 
@@ -515,6 +515,48 @@ Conclusion:
 
 ```text
 Smoke passed. Relation-specific overlap penalty is a plausible local tool for _has_part but does not solve _hypernym in smoke. It needs validation-only follow-up before any test run.
+```
+
+## WN18RR_v1 Relation-Overlap Penalty Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_relation_overlap_w005_original_w05_8ep \
+  --gpu 0 --use_causal_training --num_epochs 8 --batch_size 16 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --relation_overlap_penalty_path configs/wn18rr_v1_weak_relation_overlap.json \
+  --relation_overlap_penalty_weight 0.05 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --log_all_score_modes_validation --log_relation_metrics_validation --log_relation_mask_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.9150/0.9187
+Best all-mode observed causal_plus_effect AUC/AUC-PR 0.9179/0.9201
+No test run.
+```
+
+Mask diagnostics:
+
+```text
+epoch1 raw=0.4913/0.3690 entropy=0.5503/0.6388 relation_overlap_loss=0.0545
+epoch5 raw=0.6511/0.2848 entropy=0.5403/0.5620 relation_overlap_loss=0.0858
+epoch6 _hypernym shortcut_raw=0.0763 shortcut_entropy=0.2371
+epoch6 _has_part shortcut_raw=0.0253 shortcut_entropy=0.1139
+epoch8 raw=0.5065/0.3433 entropy=0.4768/0.5954 relation_overlap_loss=0.0516
+```
+
+Conclusion:
+
+```text
+Negative validation result. The relation-overlap penalty can reduce overlap for selected weak relations, but at weight 0.05 it often does so by suppressing shortcut masks and lowering shortcut entropy, which is a new mask-health failure. It does not improve aggregate WN18RR_v1 validation beyond the prior mainline and remains below same-env AUC-PR 0.9350. Do not test. Future WN work should not use this exact penalty; if revisited, it needs a floor-preserving formulation that penalizes high overlap without pushing shortcut raw toward zero.
 ```
 
 ## Files Kept After Consolidation

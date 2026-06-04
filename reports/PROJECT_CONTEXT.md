@@ -4120,3 +4120,29 @@ CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_rela
   --score_mode original --selection_metric auc_pr \
   --log_all_score_modes_validation --log_relation_metrics_validation --log_relation_mask_validation
 ```
+
+Result:
+
+```text
+Experiment: diag_v5_wn18rr_v1_relation_overlap_w005_original_w05_8ep
+Commit: d6cce1e
+Best validation original AUC/AUC-PR: 0.9150/0.9187
+Best all-mode observed causal_plus_effect AUC/AUC-PR: 0.9179/0.9201
+No test run.
+```
+
+Mask health:
+
+```text
+epoch1 raw=0.4913/0.3690 entropy=0.5503/0.6388 relation_overlap_loss=0.0545
+epoch5 raw=0.6511/0.2848 entropy=0.5403/0.5620 relation_overlap_loss=0.0858
+epoch6 _hypernym shortcut_raw=0.0763 shortcut_entropy=0.2371
+epoch6 _has_part shortcut_raw=0.0253 shortcut_entropy=0.1139
+epoch8 raw=0.5065/0.3433 entropy=0.4768/0.5954 relation_overlap_loss=0.0516
+```
+
+Conclusion:
+
+```text
+Negative validation result. The penalty lowers selected relation overlap but often by suppressing shortcut masks, creating a new relation-level mask-health failure. It does not beat same-env WN18RR_v1 baseline. Do not test this config. Do not continue this exact penalty unless redesigned with shortcut-floor preservation.
+```
