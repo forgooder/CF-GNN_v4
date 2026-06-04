@@ -2918,3 +2918,57 @@ Next action:
 ```text
 For WN18RR_v1, avoid direct effect margin as the next main move. Prefer score-mode and loss-weight diagnostics: try causal-only training with score_mode=causal and AUC-PR selection, or lower causal_loss_weight, before designing a different effect regularizer.
 ```
+
+## 47. 2026-06-04 WN18RR_v1 Causal Score-Mode Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_alpha_specific_causal_score_aucpr_8ep \
+  --gpu 0 \
+  --use_causal_training \
+  --num_epochs 8 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 \
+  --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal \
+  --selection_metric auc_pr
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC/AUC-PR 0.9171/0.9193
+```
+
+Mask checkpoints:
+
+```text
+epoch3 raw=0.6303/0.4196 entropy=0.5820/0.6796
+epoch6 raw=0.8464/0.4023 entropy=0.3435/0.6732
+epoch7 raw=0.5848/0.4228 entropy=0.6465/0.6809
+epoch8 raw=0.6558/0.4175 entropy=0.5891/0.6791
+```
+
+Conclusion:
+
+```text
+Direct causal scoring is not better than causal_plus_effect. The masks remain healthy, but validation AUC-PR peaks at only 0.9193, below the same-environment baseline 0.9350.
+```
+
+Next action:
+
+```text
+Do not test. The next WN18RR_v1 diagnostic should reduce causal_loss_weight, because full causal loss appears to keep masks healthy but weakens validation scoring. Try causal_loss_weight 0.3-0.5 with effect_loss_weight 0.0 and selection_metric auc_pr.
+```
