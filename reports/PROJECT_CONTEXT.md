@@ -3091,3 +3091,74 @@ Interpretation:
 ```text
 This is only a smoke result, but it shows that the original scorer inside Causal-GraIL training can outperform causal/effect score modes and can exceed the WN18RR_v1 same-env baseline validation AUC-PR. The next formal validation-only run should select by original AUC-PR and keep all-mode logging enabled.
 ```
+
+## 50. 2026-06-04 WN18RR_v1 Original-Score Formal Test
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_original_score_w05_allmodes_5ep \
+  --gpu 0 \
+  --use_causal_training \
+  --num_epochs 5 \
+  --batch_size 4 \
+  --causal_loss_weight 0.5 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 \
+  --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode original \
+  --selection_metric auc_pr \
+  --log_all_score_modes_validation
+```
+
+Validation-selected checkpoint:
+
+```text
+original validation AUC/AUC-PR 0.9253/0.9358
+```
+
+The validation signal was unstable, but it narrowly crossed same-env baseline AUC-PR, so one formal test/ranking evaluation was run.
+
+Test:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u test_auc.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_original_score_w05_allmodes_5ep --gpu 0 --score_mode original
+CUDA_VISIBLE_DEVICES=1 python -u test_ranking.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_original_score_w05_allmodes_5ep --score_mode original
+```
+
+Test result:
+
+```text
+AUC 0.9184
+AUC-PR 0.9221
+MRR 0.7114
+Hits@1 0.6614
+Hits@5 0.7641
+Hits@10 0.7712
+```
+
+Mask health:
+
+```text
+selected epoch raw=0.3254/0.4406 entropy=0.5223/0.6856
+final epoch raw=0.4370/0.4325 entropy=0.5875/0.6833
+```
+
+Conclusion:
+
+```text
+Negative formal WN18RR_v1 result. The original-score validation high point did not transfer to test. Test AUC-PR 0.9221 and Hits@10 0.7712 are far below same-env baseline AUC-PR 0.9350 and Hits@10 0.8404. Mask health is acceptable, so this is not a mask-collapse failure. Do not keep tuning this configuration using test feedback.
+```
+
+Current WN18RR_v1 judgment:
+
+```text
+v5 alpha-specific regularization materially improves mask health, but current objectives do not produce stable WN18RR_v1 gains over same-environment GRAIL. Move on to WN18RR_v2/v4 with all-mode validation logging or start v6 objective design if the pattern repeats.
+```
