@@ -161,6 +161,8 @@ if __name__ == '__main__':
                         help="Log validation AUC/AUC-PR for every score mode; default off and does not affect checkpoint selection")
     parser.add_argument("--log_relation_metrics_validation", action='store_true',
                         help="Log validation AUC/AUC-PR grouped by target relation for the selected score mode; default off")
+    parser.add_argument("--log_relation_mask_validation", action='store_true',
+                        help="Log validation mask diagnostics grouped by target relation; default off")
 
     # Data processing pipeline params
     parser.add_argument("--max_links", type=int, default=1000000,

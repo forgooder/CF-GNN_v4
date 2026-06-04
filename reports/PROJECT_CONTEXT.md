@@ -4004,3 +4004,42 @@ Conclusion:
 ```text
 Negative validation result. Warmup/ramp does not rescue WN18RR_v1 original AUC-PR and does not improve weak relations. It confirms that v5 can keep masks non-collapsed while still failing WN relation families. Do not run test for this config. Next WN work should inspect or change relation-specific scoring/objectives for _hypernym and _has_part; avoid more global mask scalar sweeps unless tied to a concrete relation-level hypothesis.
 ```
+
+## 64. 2026-06-04 Relation-Level Mask Diagnostics
+
+Reason:
+
+```text
+WN18RR_v1 relation-level score metrics show _hypernym and _has_part are weak, but global mask means hide whether these relations have distinct mask failures. Add relation-level mask diagnostics before designing relation-specific objectives.
+```
+
+Code change:
+
+```text
+Added --log_relation_mask_validation
+Validation logs per-relation edge_count, causal_raw_mean, shortcut_raw_mean, causal_entropy, shortcut_entropy, and overlap.
+Default off. Does not affect training, selection, data, negative sampling, subgraph extraction, or metrics.
+```
+
+Smoke result:
+
+```text
+Experiment: smoke_v5_relation_mask_validation
+Best validation original AUC/AUC-PR: 0.8987/0.9163
+No test run.
+Final epoch raw=0.3502/0.4386 entropy=0.4681/0.6843
+```
+
+Initial relation-mask observations:
+
+```text
+_hypernym later causal_raw_mean=0.4204, causal_entropy=0.1535
+_has_part later causal_raw_mean=0.6957, overlap=0.2902
+_derivationally_related_form later causal_raw_mean=0.3246, causal_entropy=0.5982
+```
+
+Conclusion:
+
+```text
+Relation-level mask logging works and reveals non-uniform relation failures. _hypernym looks low-entropy; _has_part looks high-causal/high-overlap. Next run should use this logger on an 8 epoch validation-only WN18RR_v1 mainline diagnostic before adding relation-specific regularization.
+```

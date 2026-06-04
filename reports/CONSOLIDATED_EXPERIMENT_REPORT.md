@@ -1,6 +1,6 @@
 # Causal-GraIL v5 Consolidated Experiment Report
 
-Updated: 2026-06-04 20:54 CST
+Updated: 2026-06-04 21:04 CST
 
 ## Scope
 
@@ -36,6 +36,7 @@ Important default-off additions now available:
 --effect_score_clamp
 --masked_aux_gradient_mode {full,mask_only}
 --log_relation_metrics_validation
+--log_relation_mask_validation
 ```
 
 Baseline path remains default-preserving: causal training is only active with `--use_causal_training`, and new parameters are default-off or default-compatible.
@@ -350,6 +351,65 @@ Conclusion:
 
 ```text
 Negative validation result. Causal loss warmup/ramp works mechanically and keeps masks non-collapsed, but does not close the WN18RR_v1 baseline gap. Once causal loss ramps on, validation drops and causal mask raw mean/overlap rise. Do not test this configuration. WN18RR still needs a relation-aware objective or feature/scorer change targeted at _hypernym and _has_part, not another global auxiliary-loss schedule.
+```
+
+## Code Review Update: Relation-Level Mask Diagnostics
+
+Code change:
+
+```text
+Added default-off --log_relation_mask_validation.
+When enabled, validation logs edge_count, causal_raw_mean, shortcut_raw_mean, causal_entropy, shortcut_entropy, and overlap grouped by target relation.
+This is diagnostic-only and does not affect training loss, checkpoint selection, data, negative sampling, subgraph extraction, or metric computation.
+```
+
+Verification:
+
+```bash
+python -m py_compile train.py managers/trainer.py managers/evaluator.py
+python train.py --help | rg "log_relation_mask_validation|log_relation_metrics_validation"
+```
+
+Smoke:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e smoke_v5_relation_mask_validation \
+  --gpu 0 --use_causal_training --num_epochs 1 --batch_size 4 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --log_relation_metrics_validation --log_relation_mask_validation
+```
+
+Smoke result:
+
+```text
+Best validation original AUC/AUC-PR: 0.8987/0.9163
+No test run.
+Final epoch raw=0.3502/0.4386 entropy=0.4681/0.6843
+```
+
+Relation mask observations from smoke:
+
+```text
+Early validation point:
+_hypernym causal_raw_mean=0.0916, causal_entropy=0.2654
+_has_part causal_raw_mean=0.1347, causal_entropy=0.3346
+_derivationally_related_form causal_raw_mean=0.0356, causal_entropy=0.1432
+
+Later validation point:
+_hypernym causal_raw_mean=0.4204, causal_entropy=0.1535
+_has_part causal_raw_mean=0.6957, overlap=0.2902
+_derivationally_related_form causal_raw_mean=0.3246, causal_entropy=0.5982
+```
+
+Conclusion:
+
+```text
+Smoke passed and shows that WN weak relations do not share one mask failure mode: _hypernym becomes low-entropy, while _has_part becomes high-causal/high-overlap. The next diagnostic should run the relation-mask logger on an 8 epoch validation-only WN18RR_v1 mainline configuration before designing relation-specific regularization.
 ```
 
 ## Files Kept After Consolidation

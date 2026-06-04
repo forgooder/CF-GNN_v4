@@ -357,6 +357,9 @@ class Trainer():
                 if getattr(self.params, 'log_relation_metrics_validation', False):
                     relation_result = self.valid_evaluator.eval_by_relation(getattr(self.params, 'score_mode', 'original'))
                     logging.info('\nValidation relation metrics:' + str(relation_result))
+                if getattr(self.params, 'log_relation_mask_validation', False):
+                    relation_mask_result = self.valid_evaluator.eval_mask_by_relation()
+                    logging.info('\nValidation relation mask metrics:' + str(relation_mask_result))
 
                 selection_metric = getattr(self.params, 'selection_metric', 'auc')
                 current_metric = result[selection_metric]

@@ -153,3 +153,75 @@ class Evaluator():
             results,
             key=lambda item: (-1.0 if item['auc_pr'] is None else item['auc_pr'], item['rel_id'])
         )
+
+    def _add_relation_mask_stats(self, relation_masks, outputs):
+        rel_labels = outputs.get('target_rel_labels')
+        if rel_labels is None:
+            return
+
+        eps = 1e-8
+        rel_labels = rel_labels.view(-1).detach().cpu()
+        causal_raw = outputs['causal_raw_mask'].view(-1).detach().cpu()
+        shortcut_raw = outputs['shortcut_raw_mask'].view(-1).detach().cpu()
+        causal_entropy = -(
+            causal_raw * torch.log(causal_raw + eps)
+            + (1 - causal_raw) * torch.log(1 - causal_raw + eps)
+        )
+        shortcut_entropy = -(
+            shortcut_raw * torch.log(shortcut_raw + eps)
+            + (1 - shortcut_raw) * torch.log(1 - shortcut_raw + eps)
+        )
+        overlap = causal_raw * shortcut_raw
+
+        for rel_id, causal, shortcut, c_entropy, s_entropy, ov in zip(
+            rel_labels.tolist(),
+            causal_raw.tolist(),
+            shortcut_raw.tolist(),
+            causal_entropy.tolist(),
+            shortcut_entropy.tolist(),
+            overlap.tolist()
+        ):
+            bucket = relation_masks.setdefault(int(rel_id), {
+                'count': 0,
+                'causal_raw_sum': 0.0,
+                'shortcut_raw_sum': 0.0,
+                'causal_entropy_sum': 0.0,
+                'shortcut_entropy_sum': 0.0,
+                'overlap_sum': 0.0
+            })
+            bucket['count'] += 1
+            bucket['causal_raw_sum'] += float(causal)
+            bucket['shortcut_raw_sum'] += float(shortcut)
+            bucket['causal_entropy_sum'] += float(c_entropy)
+            bucket['shortcut_entropy_sum'] += float(s_entropy)
+            bucket['overlap_sum'] += float(ov)
+
+    def eval_mask_by_relation(self):
+        relation_masks = {}
+        dataloader = DataLoader(self.data, batch_size=self.params.batch_size, shuffle=False, num_workers=self.params.num_workers, collate_fn=self.params.collate_fn)
+
+        self.graph_classifier.eval()
+        with torch.no_grad():
+            for b_idx, batch in enumerate(dataloader):
+                data_pos, targets_pos, data_neg, targets_neg = self.params.move_batch_to_device(batch, self.params.device)
+                outputs_pos = self.graph_classifier(data_pos, mode='all')
+                outputs_neg = self.graph_classifier(data_neg, mode='all')
+                self._add_relation_mask_stats(relation_masks, outputs_pos)
+                self._add_relation_mask_stats(relation_masks, outputs_neg)
+
+        id2relation = getattr(self.data, 'id2relation', {})
+        results = []
+        for rel_id, bucket in relation_masks.items():
+            count = max(1, bucket['count'])
+            results.append({
+                'rel_id': int(rel_id),
+                'relation': id2relation.get(int(rel_id), str(rel_id)),
+                'edge_count': int(bucket['count']),
+                'causal_raw_mean': bucket['causal_raw_sum'] / count,
+                'shortcut_raw_mean': bucket['shortcut_raw_sum'] / count,
+                'causal_entropy': bucket['causal_entropy_sum'] / count,
+                'shortcut_entropy': bucket['shortcut_entropy_sum'] / count,
+                'overlap': bucket['overlap_sum'] / count
+            })
+
+        return sorted(results, key=lambda item: item['rel_id'])
