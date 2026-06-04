@@ -3686,3 +3686,65 @@ Conclusion:
 ```text
 Code smoke passed. The new mask-only auxiliary gradient mode is default-off, compiles, appears in CLI help, runs forward/backward, and logs expected diagnostics. It is not a performance result. Next step is an 8-epoch WN18RR_v1 validation-only diagnostic.
 ```
+
+## 59. 2026-06-04 WN18RR_v1 Mask-Only Auxiliary Gradient Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_masked_aux_mask_only_original_w05_8ep \
+  --gpu 0 \
+  --use_causal_training \
+  --num_epochs 8 \
+  --batch_size 16 \
+  --causal_loss_weight 0.5 \
+  --effect_loss_weight 0.0 \
+  --masked_aux_gradient_mode mask_only \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 \
+  --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode original \
+  --selection_metric auc_pr \
+  --log_all_score_modes_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.9150/0.9166
+```
+
+All-mode snapshot at best validation point:
+
+```text
+original AUC/AUC-PR 0.9150/0.9166
+causal AUC/AUC-PR 0.9152/0.9162
+shortcut AUC/AUC-PR 0.9152/0.9169
+effect AUC/AUC-PR 0.7066/0.7919
+causal_plus_effect AUC/AUC-PR 0.9148/0.9154
+```
+
+Mask health:
+
+```text
+epoch6 raw=0.5765/0.4227 entropy=0.5773/0.6805 budget=0.0613 overlap=0.2403
+epoch8 raw=0.6464/0.4176 entropy=0.5617/0.6789 budget=0.0755 overlap=0.2690
+```
+
+Conclusion:
+
+```text
+Negative diagnostic. Mask-only auxiliary gradients keep masks very healthy but do not improve WN18RR_v1 validation; best AUC-PR 0.9166 is below the no-penalty mainline and below same-env baseline 0.9350. This weakens the hypothesis that WN18RR failure is primarily caused by auxiliary masked-loss gradients distorting the shared scorer.
+```
+
+Updated WN18RR judgment:
+
+```text
+WN18RR_v1 has now failed with healthy masks under causal-only alpha-specific regularization, shortcut score penalty, and mask-only auxiliary gradients. The remaining issue is likely objective/data interaction rather than v4-style mask collapse. Next useful WN18RR work should examine relation-aware behavior or a more fundamental effect objective redesign; do not run test on current WN variants.
+```
