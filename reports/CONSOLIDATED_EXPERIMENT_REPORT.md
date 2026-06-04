@@ -17,7 +17,7 @@ v5-alpha-beta-mask
 Latest relevant commit:
 
 ```text
-97de083 Add causal loss warmup ramp
+daac33a Add causal loss warmup ramp
 ```
 
 Important default-off additions now available:
