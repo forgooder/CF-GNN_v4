@@ -3278,3 +3278,89 @@ Current WN18RR judgment:
 ```text
 Across WN18RR_v1, WN18RR_v2, and WN18RR_v4, alpha-specific causal-only training with logit regularization prevents the old v4-style mask collapse but does not beat same-environment GRAIL. Further WN18RR work should require a structural objective change, not more scalar tuning. The next useful check is NELL_v1 original-score/all-mode validation because NELL_v1 alpha-specific causal-only had the best prior validation signal.
 ```
+
+## 53. 2026-06-04 NELL_v1 Original-Score Formal Test
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d nell_v1 -e diag_v5_nell_v1_original_score_w05_allmodes_10ep \
+  --gpu 0 \
+  --use_causal_training \
+  --num_epochs 10 \
+  --batch_size 16 \
+  --causal_loss_weight 0.5 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 \
+  --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode original \
+  --selection_metric auc_pr \
+  --log_all_score_modes_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.9073/0.9234
+```
+
+All-mode snapshot at selected validation point:
+
+```text
+original AUC/AUC-PR 0.9073/0.9232
+causal AUC/AUC-PR 0.9065/0.9219
+shortcut AUC/AUC-PR 0.9045/0.9213
+effect AUC/AUC-PR 0.7323/0.8211
+causal_plus_effect AUC/AUC-PR 0.9059/0.9220
+```
+
+Mask health:
+
+```text
+epoch8 raw=0.7385/0.4106 entropy=0.3464/0.6759 budget=0.1692 overlap=0.2971
+epoch10 raw=0.6634/0.4166 entropy=0.4689/0.6782 budget=0.1134 overlap=0.2714
+```
+
+Test:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u test_auc.py -d nell_v1 -e diag_v5_nell_v1_original_score_w05_allmodes_10ep --gpu 0 --score_mode original
+CUDA_VISIBLE_DEVICES=1 python -u test_ranking.py -d nell_v1 -e diag_v5_nell_v1_original_score_w05_allmodes_10ep --score_mode original
+```
+
+Test result:
+
+```text
+AUC 0.8943
+AUC-PR 0.9230
+MRR 0.7247
+Hits@1 0.6469
+Hits@5 0.8212
+Hits@10 0.8531
+```
+
+Comparison:
+
+```text
+Same-env NELL_v1 baseline: AUC 0.8691, AUC-PR 0.7967, MRR 0.5246, Hits@1 0.4750, Hits@10 0.5700
+Paper NELL-995 v1: AUC-PR 0.8605, Hits@10 0.5950
+```
+
+Conclusion:
+
+```text
+Positive formal NELL_v1 result. The run exceeds same-env baseline on AUC, AUC-PR, MRR, Hits@1, and Hits@10, and also exceeds paper AUC-PR/Hits@10 targets. Masks are not collapsed, although alpha remains moderately open. Do not tune this exact configuration using the test result.
+```
+
+Current overall judgment:
+
+```text
+v5 alpha-specific causal-only training with logit regularization materially mitigates v4 mask collapse. It is negative on WN18RR_v1/v2/v4 under original-score/all-mode validation and one WN18RR_v1 test, but positive on NELL_v1 with a large formal test improvement. The next priority should be a stability check on NELL_v1 or FB237_v1 validation, not more WN18RR scalar tuning.
+```
