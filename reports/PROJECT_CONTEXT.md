@@ -3217,3 +3217,64 @@ Conclusion:
 ```text
 Negative validation result. The alpha-specific causal-only path prevents the earlier WN18RR_v2 effect-loss collapse, but validation AUC-PR 0.9272 remains below same-env baseline 0.9479 and paper target 0.9418. No test was run. This reinforces that v5's current mask-health improvements are not translating into stronger WN18RR scoring.
 ```
+
+## 52. 2026-06-04 WN18RR_v4 Original-Score All-Mode Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v4 -e diag_v5_wn18rr_v4_original_score_w05_allmodes_5ep \
+  --gpu 0 \
+  --use_causal_training \
+  --num_epochs 5 \
+  --batch_size 16 \
+  --causal_loss_weight 0.5 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 \
+  --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode original \
+  --selection_metric auc_pr \
+  --log_all_score_modes_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.9064/0.9143
+```
+
+All-mode snapshot at selected validation point:
+
+```text
+original AUC/AUC-PR 0.9064/0.9143
+causal AUC/AUC-PR 0.9063/0.9142
+shortcut AUC/AUC-PR 0.9048/0.9133
+effect AUC/AUC-PR 0.8225/0.8543
+causal_plus_effect AUC/AUC-PR 0.9064/0.9143
+```
+
+Mask health:
+
+```text
+epoch1 raw=0.4346/0.4320 entropy=0.3800/0.6814 budget=0.1264 overlap=0.1785
+epoch5 raw=0.5460/0.4256 entropy=0.4624/0.6811 budget=0.1058 overlap=0.2263
+```
+
+Conclusion:
+
+```text
+Negative validation result. Masks are non-collapsed, but best validation AUC-PR 0.9143 is far below the same-env WN18RR_v4 baseline 0.9354. This repeats the WN18RR_v1/v2 pattern: the current v5 objective improves mask health but does not produce a stronger scorer. No test was run.
+```
+
+Current WN18RR judgment:
+
+```text
+Across WN18RR_v1, WN18RR_v2, and WN18RR_v4, alpha-specific causal-only training with logit regularization prevents the old v4-style mask collapse but does not beat same-environment GRAIL. Further WN18RR work should require a structural objective change, not more scalar tuning. The next useful check is NELL_v1 original-score/all-mode validation because NELL_v1 alpha-specific causal-only had the best prior validation signal.
+```
