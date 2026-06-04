@@ -4043,3 +4043,37 @@ Conclusion:
 ```text
 Relation-level mask logging works and reveals non-uniform relation failures. _hypernym looks low-entropy; _has_part looks high-causal/high-overlap. Next run should use this logger on an 8 epoch validation-only WN18RR_v1 mainline diagnostic before adding relation-specific regularization.
 ```
+
+## 65. 2026-06-04 WN18RR_v1 Relation-Mask Diagnostic
+
+Result:
+
+```text
+Experiment: diag_v5_wn18rr_v1_relation_mask_original_w05_8ep
+Commit: 1f852d4
+Best validation original AUC/AUC-PR: 0.9090/0.9168
+Best all-mode observed causal AUC/AUC-PR: 0.9175/0.9191
+No test run.
+```
+
+Global mask:
+
+```text
+epoch1 raw=0.4064/0.4341 entropy=0.4329/0.6825
+epoch4 raw=0.5742/0.4235 entropy=0.6451/0.6812
+epoch8 raw=0.6603/0.4174 entropy=0.5437/0.6789 overlap=0.2725
+```
+
+Best-point relation mask:
+
+```text
+_hypernym score AUC-PR=0.6987, causal_raw=0.7013, shortcut_raw=0.4134, causal_entropy=0.5337, overlap=0.2877
+_has_part score AUC-PR=0.6522, causal_raw=0.7026, shortcut_raw=0.4157, causal_entropy=0.5827, overlap=0.2913
+_derivationally_related_form score AUC-PR=0.9582, causal_raw=0.5613, shortcut_raw=0.4260, causal_entropy=0.6550, overlap=0.2382
+```
+
+Conclusion:
+
+```text
+Negative validation result. WN weak relations remain poor despite non-collapsed global masks. Larger causal masks are not sufficient; weak relations often already have larger causal raw and overlap than strong relations. Next WN change should test weak-relation overlap/high-causal saturation penalties, or a relation-family-specific objective/scorer. Do not run test for this configuration.
+```

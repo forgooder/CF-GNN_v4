@@ -1,6 +1,6 @@
 # Causal-GraIL v5 Consolidated Experiment Report
 
-Updated: 2026-06-04 21:04 CST
+Updated: 2026-06-04 21:13 CST
 
 ## Scope
 
@@ -410,6 +410,52 @@ Conclusion:
 
 ```text
 Smoke passed and shows that WN weak relations do not share one mask failure mode: _hypernym becomes low-entropy, while _has_part becomes high-causal/high-overlap. The next diagnostic should run the relation-mask logger on an 8 epoch validation-only WN18RR_v1 mainline configuration before designing relation-specific regularization.
+```
+
+## WN18RR_v1 Relation-Mask Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_relation_mask_original_w05_8ep \
+  --gpu 0 --use_causal_training --num_epochs 8 --batch_size 16 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --log_all_score_modes_validation --log_relation_metrics_validation --log_relation_mask_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.9090/0.9168
+Best all-mode observed: causal AUC/AUC-PR 0.9175/0.9191
+No test run.
+```
+
+Global mask:
+
+```text
+epoch1 raw=0.4064/0.4341 entropy=0.4329/0.6825
+epoch4 raw=0.5742/0.4235 entropy=0.6451/0.6812
+epoch8 raw=0.6603/0.4174 entropy=0.5437/0.6789 overlap=0.2725
+```
+
+Best-point relation mask observations:
+
+```text
+_hypernym score AUC-PR=0.6987, causal_raw=0.7013, shortcut_raw=0.4134, causal_entropy=0.5337, overlap=0.2877
+_has_part score AUC-PR=0.6522, causal_raw=0.7026, shortcut_raw=0.4157, causal_entropy=0.5827, overlap=0.2913
+_derivationally_related_form score AUC-PR=0.9582, causal_raw=0.5613, shortcut_raw=0.4260, causal_entropy=0.6550, overlap=0.2382
+```
+
+Conclusion:
+
+```text
+Negative validation result. Relation-mask logging confirms v5 no longer has global v4-style collapse, but WN weak relation families still fail. _hypernym and _has_part often show higher causal raw and overlap than strong relations, so forcing larger causal budgets is not the right direction. The next WN attempt should either penalize weak-relation overlap/high causal saturation, or introduce relation-family-specific scoring/objective changes; do not run test for this configuration.
 ```
 
 ## Files Kept After Consolidation
