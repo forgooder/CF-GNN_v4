@@ -4199,3 +4199,26 @@ CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_rela
   --score_mode original --selection_metric auc_pr \
   --log_all_score_modes_validation --log_relation_metrics_validation --log_relation_mask_validation
 ```
+
+Result:
+
+```text
+Experiment: diag_v5_wn18rr_v1_relation_overlap_floor_original_w05_8ep
+Commit: 86e05a9
+Best validation original AUC/AUC-PR: 0.9158/0.9197
+No test run.
+```
+
+Best-point mask:
+
+```text
+global raw=0.6148/0.3604 entropy=0.5666/0.6462
+_hypernym AUC-PR=0.7078, causal_raw=0.3759, shortcut_raw=0.3545, entropy=0.6435/0.6491, overlap=0.1339
+_has_part AUC-PR=0.6877, causal_raw=0.4576, shortcut_raw=0.3925, entropy=0.6698/0.6693, overlap=0.1784
+```
+
+Conclusion:
+
+```text
+Negative validation result. Shortcut floor fixes relation-overlap mask collapse, but WN weak-relation ranking remains weak. Do not test. Do not keep sweeping overlap/floor weights unless there is a new relation-scoring hypothesis; current evidence points to scorer/objective limits rather than mask-health-only failure.
+```

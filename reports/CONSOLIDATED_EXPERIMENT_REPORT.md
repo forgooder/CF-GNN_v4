@@ -1,6 +1,6 @@
 # Causal-GraIL v5 Consolidated Experiment Report
 
-Updated: 2026-06-04 22:05 CST
+Updated: 2026-06-04 22:18 CST
 
 ## Scope
 
@@ -618,6 +618,47 @@ Conclusion:
 
 ```text
 Smoke passed. The shortcut floor prevents the relation-overlap penalty from collapsing weak-relation shortcut masks and reaches a stronger WN18RR_v1 smoke AUC-PR than the previous overlap-only diagnostic. It is still below same-env baseline AUC-PR 0.9350, so it requires validation-only follow-up before any test run.
+```
+
+## WN18RR_v1 Relation Overlap + Shortcut Floor Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_relation_overlap_floor_original_w05_8ep \
+  --gpu 0 --use_causal_training --num_epochs 8 --batch_size 16 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --relation_overlap_penalty_path configs/wn18rr_v1_weak_relation_overlap.json \
+  --relation_overlap_penalty_weight 0.03 \
+  --relation_shortcut_floor_path configs/wn18rr_v1_weak_relation_shortcut_floor.json \
+  --relation_shortcut_floor_weight 0.1 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --log_all_score_modes_validation --log_relation_metrics_validation --log_relation_mask_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.9158/0.9197
+No test run.
+```
+
+Best-point mask:
+
+```text
+global raw=0.6148/0.3604 entropy=0.5666/0.6462
+_hypernym AUC-PR=0.7078, causal_raw=0.3759, shortcut_raw=0.3545, entropy=0.6435/0.6491, overlap=0.1339
+_has_part AUC-PR=0.6877, causal_raw=0.4576, shortcut_raw=0.3925, entropy=0.6698/0.6693, overlap=0.1784
+```
+
+Conclusion:
+
+```text
+Negative validation result. The shortcut floor fixes the mask-health failure introduced by relation-overlap penalty, but it does not fix WN18RR weak-relation ranking. The best validation AUC-PR remains below same-env baseline 0.9350 and below the no-floor/no-overlap relation-metrics diagnostic. Do not test. This narrows the WN issue further: mask health can be made acceptable, but _hypernym and _has_part remain structurally hard for the current scorer/objective.
 ```
 
 ## Files Kept After Consolidation
