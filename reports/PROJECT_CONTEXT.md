@@ -2861,3 +2861,60 @@ Next action:
 ```text
 Try a strictly controlled, very small effect-loss reintroduction only after mask warmup, selected by AUC-PR. Start with effect_loss_weight around 0.005-0.01, warmup 3, ramp 5, clamp 10. Abort if alpha entropy drops below about 0.15, shortcut entropy collapses, or score means/norms explode.
 ```
+
+## 46. 2026-06-04 WN18RR_v1 Tiny Effect Follow-Up
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_tiny_effect_warmup_aucpr_8ep \
+  --gpu 0 \
+  --use_causal_training \
+  --num_epochs 8 \
+  --batch_size 16 \
+  --causal_loss_weight 1.0 \
+  --effect_loss_weight 0.005 \
+  --effect_loss_warmup_epochs 3 \
+  --effect_loss_ramp_epochs 5 \
+  --effect_score_clamp 10 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 \
+  --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode causal_plus_effect \
+  --selection_metric auc_pr
+```
+
+No test-set evaluation was run.
+
+Validation:
+
+```text
+best validation AUC/AUC-PR 0.9133/0.9166
+```
+
+Mask checkpoints:
+
+```text
+epoch3 effect_weight=0.000 raw=0.8269/0.4027 entropy=0.3155/0.6732
+epoch4 effect_weight=0.001 raw=0.7055/0.3791 entropy=0.4655/0.6048
+epoch6 effect_weight=0.003 raw=0.7892/0.4702 entropy=0.3653/0.5166 budget=0.2413 overlap=0.3943
+epoch8 effect_weight=0.005 raw=0.7126/0.4194 entropy=0.4706/0.4772 budget=0.2014 overlap=0.3147
+```
+
+Conclusion:
+
+```text
+Tiny delayed effect loss with clamp 10 does not explode, but it also does not improve validation. It starts to reduce shortcut entropy and increase overlap/budget pressure once ramped. Do not continue this exact configuration and do not test it.
+```
+
+Next action:
+
+```text
+For WN18RR_v1, avoid direct effect margin as the next main move. Prefer score-mode and loss-weight diagnostics: try causal-only training with score_mode=causal and AUC-PR selection, or lower causal_loss_weight, before designing a different effect regularizer.
+```
