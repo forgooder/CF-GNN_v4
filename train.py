@@ -105,6 +105,10 @@ if __name__ == '__main__':
                         help="Enable Causal-GraIL training losses. Default keeps the original GraIL baseline.")
     parser.add_argument("--causal_loss_weight", type=float, default=1.0,
                         help="Weight for causal score margin ranking loss when causal training is enabled")
+    parser.add_argument("--causal_loss_warmup_epochs", type=int, default=0,
+                        help="Number of initial epochs with causal auxiliary loss disabled during causal training")
+    parser.add_argument("--causal_loss_ramp_epochs", type=int, default=0,
+                        help="Number of epochs used to linearly ramp causal auxiliary loss after warmup; 0 preserves step activation")
     parser.add_argument("--effect_loss_weight", type=float, default=1.0,
                         help="Weight for causal effect margin ranking loss when causal training is enabled")
     parser.add_argument("--effect_loss_warmup_epochs", type=int, default=0,

@@ -1,6 +1,6 @@
 # Causal-GraIL v5 Consolidated Experiment Report
 
-Updated: 2026-06-04 20:03 CST
+Updated: 2026-06-04 20:35 CST
 
 ## Scope
 
@@ -17,7 +17,7 @@ v5-alpha-beta-mask
 Latest relevant commit:
 
 ```text
-ef31ec5 Add WN18RR v1 mask-only auxiliary diagnostic
+97de083 Add causal loss warmup ramp
 ```
 
 Important default-off additions now available:
@@ -30,6 +30,8 @@ Important default-off additions now available:
 --causal_mask_logit_l2_weight
 --effect_loss_warmup_epochs
 --effect_loss_ramp_epochs
+--causal_loss_warmup_epochs
+--causal_loss_ramp_epochs
 --effect_gradient_mode
 --effect_score_clamp
 --masked_aux_gradient_mode {full,mask_only}
@@ -248,6 +250,59 @@ Conclusion:
 
 ```text
 This relation-aware budget is negative. It does not improve aggregate WN18RR_v1 validation and does not reliably repair _hypernym or _has_part. The next relation-aware attempt should not simply force weak relations to larger causal masks; it needs either per-relation diagnostics of mask means or a different relation-specific objective.
+```
+
+## Code Review Update: Causal Loss Warmup/Ramp
+
+Review finding:
+
+```text
+WN18RR diagnostics now have healthy masks but weak original validation scores. One likely training issue is that the masked auxiliary causal loss competes with the original GraIL scorer from epoch 1, before the original scorer has stabilized. This can depress the score mode that currently works best on NELL_v1 and FB237_v1: original.
+```
+
+Code change:
+
+```text
+Added default-off --causal_loss_warmup_epochs and --causal_loss_ramp_epochs.
+The training loop now logs causal_loss_weight and causal_loss_ramp_factor.
+Default behavior is preserved: warmup=0 and ramp=0 keep immediate activation at --causal_loss_weight.
+Also hardened relation-level validation logging for multi-negative batches by repeating relation labels when score_neg has expanded length.
+```
+
+Verification:
+
+```bash
+python -m py_compile train.py managers/trainer.py managers/evaluator.py
+python train.py --help | rg "causal_loss_warmup|causal_loss_ramp|causal_loss_weight"
+```
+
+Smoke:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e smoke_v5_causal_loss_warmup \
+  --gpu 0 --use_causal_training --num_epochs 1 --batch_size 4 \
+  --causal_loss_weight 0.5 --causal_loss_warmup_epochs 1 --causal_loss_ramp_epochs 3 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr --log_all_score_modes_validation
+```
+
+Smoke result:
+
+```text
+Best validation original AUC/AUC-PR: 0.8988/0.9067
+Best validation causal AUC/AUC-PR: 0.9223/0.9244
+Epoch1 causal_loss_weight=0.0 and causal_loss_ramp_factor=0.0 as expected.
+Epoch1 mask raw=0.4545/0.4325, entropy=0.6890/0.6839, budget=0.0004, overlap=0.1966.
+```
+
+Conclusion:
+
+```text
+Smoke passed. This is not a performance result. The change is default-off and keeps baseline behavior unchanged. Next step is a validation-only WN18RR_v1 run with causal_loss_warmup=3 and causal_loss_ramp=3; run test only if validation AUC-PR and mask health qualify.
 ```
 
 ## Files Kept After Consolidation

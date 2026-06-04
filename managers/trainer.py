@@ -197,6 +197,17 @@ class Trainer():
         ramp_progress = min(1.0, float(self.current_epoch - warmup_epochs) / float(ramp_epochs))
         return target_weight * ramp_progress, ramp_progress
 
+    def current_causal_loss_weight(self):
+        target_weight = getattr(self.params, 'causal_loss_weight', 1.0)
+        warmup_epochs = getattr(self.params, 'causal_loss_warmup_epochs', 0)
+        ramp_epochs = max(0, getattr(self.params, 'causal_loss_ramp_epochs', 0))
+        if self.current_epoch <= warmup_epochs:
+            return 0.0, 0.0
+        if ramp_epochs == 0:
+            return target_weight, 1.0
+        ramp_progress = min(1.0, float(self.current_epoch - warmup_epochs) / float(ramp_epochs))
+        return target_weight * ramp_progress, ramp_progress
+
     def effect_scores_for_loss(self, outputs_pos, outputs_neg):
         mode = getattr(self.params, 'effect_gradient_mode', 'full')
         causal_pos = outputs_pos['causal']
@@ -258,11 +269,12 @@ class Trainer():
         effect_loss = self.ranking_loss(effect_pos, effect_neg)
         mask_reg_loss, mask_stats = self.mask_regularization(outputs_pos, outputs_neg)
         shortcut_loss = self.shortcut_penalty(outputs_pos, outputs_neg)
+        causal_loss_weight, causal_loss_ramp_factor = self.current_causal_loss_weight()
         effect_loss_weight, effect_loss_ramp_factor = self.current_effect_loss_weight()
 
         total_loss = (
             original_loss
-            + getattr(self.params, 'causal_loss_weight', 1.0) * causal_loss
+            + causal_loss_weight * causal_loss
             + effect_loss_weight * effect_loss
             + mask_reg_loss
             + shortcut_loss
@@ -275,6 +287,8 @@ class Trainer():
         stats = {
             'original_loss': original_loss.item(),
             'causal_loss': causal_loss.item(),
+            'causal_loss_weight': causal_loss_weight,
+            'causal_loss_ramp_factor': causal_loss_ramp_factor,
             'effect_loss': effect_loss.item(),
             'effect_loss_weight': effect_loss_weight,
             'effect_loss_ramp_factor': effect_loss_ramp_factor,

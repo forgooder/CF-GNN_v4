@@ -111,7 +111,11 @@ class Evaluator():
                 score_pos = forward_for_score(self.graph_classifier, data_pos, score_mode).view(-1).detach().cpu()
                 score_neg = forward_for_score(self.graph_classifier, data_neg, score_mode).view(-1).detach().cpu()
                 rel_pos = data_pos[1].view(-1).detach().cpu().tolist()
-                rel_neg = data_neg[1].view(-1).detach().cpu().tolist()
+                rel_neg_tensor = data_neg[1].view(-1).detach().cpu()
+                if len(rel_neg_tensor) != len(score_neg):
+                    repeat_factor = int(len(score_neg) / max(1, len(rel_neg_tensor)))
+                    rel_neg_tensor = rel_neg_tensor.repeat_interleave(repeat_factor)
+                rel_neg = rel_neg_tensor.tolist()
 
                 for rel_id, score, label in zip(rel_pos, score_pos.tolist(), targets_pos.detach().cpu().tolist()):
                     bucket = relation_scores.setdefault(int(rel_id), {'scores': [], 'labels': []})

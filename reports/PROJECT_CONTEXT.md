@@ -3911,3 +3911,73 @@ Conclusion:
 ```text
 Negative validation result. Forcing weak WN18RR relations toward larger causal and smaller shortcut masks does not improve aggregate validation or reliably repair _hypernym/_has_part. Do not test. Next WN work should log per-relation mask means or redesign the relation-specific objective instead of guessing relation budgets.
 ```
+
+## 63. 2026-06-04 Code Review: Causal Loss Warmup/Ramp
+
+Reason:
+
+```text
+The current WN18RR problem is no longer v4-style mask collapse; masks are mostly healthy, but validation AUC-PR remains below same-env GRAIL. Code review suggests the causal auxiliary loss may be too strong too early for WN18RR when the selected evaluation mode is original. A default-off warmup/ramp lets the original scorer stabilize before auxiliary causal pressure is applied.
+```
+
+Code change:
+
+```text
+Added --causal_loss_warmup_epochs
+Added --causal_loss_ramp_epochs
+Logged causal_loss_weight and causal_loss_ramp_factor
+Fixed relation-level validation label alignment for multi-negative score tensors
+```
+
+Default behavior:
+
+```text
+warmup=0 and ramp=0 preserve the previous causal training behavior.
+Baseline remains unchanged because all causal logic is still gated by --use_causal_training.
+The relation-metric alignment change only affects default-off diagnostics.
+```
+
+Verification:
+
+```bash
+python -m py_compile train.py managers/trainer.py managers/evaluator.py
+python train.py --help | rg "causal_loss_warmup|causal_loss_ramp|causal_loss_weight"
+```
+
+Smoke:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e smoke_v5_causal_loss_warmup \
+  --gpu 0 --use_causal_training --num_epochs 1 --batch_size 4 \
+  --causal_loss_weight 0.5 --causal_loss_warmup_epochs 1 --causal_loss_ramp_epochs 3 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr --log_all_score_modes_validation
+```
+
+Smoke result:
+
+```text
+Best validation original AUC/AUC-PR: 0.8988/0.9067
+Best validation causal AUC/AUC-PR: 0.9223/0.9244
+epoch1 causal_loss_weight=0.0, causal_loss_ramp_factor=0.0
+epoch1 raw=0.4545/0.4325 entropy=0.6890/0.6839 budget=0.0004 overlap=0.1966
+```
+
+Next command:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_causal_warmup3_ramp3_original_w05_8ep \
+  --gpu 0 --use_causal_training --num_epochs 8 --batch_size 16 \
+  --causal_loss_weight 0.5 --causal_loss_warmup_epochs 3 --causal_loss_ramp_epochs 3 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --log_all_score_modes_validation --log_relation_metrics_validation
+```
