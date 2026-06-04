@@ -2792,3 +2792,72 @@ Next action:
 ```text
 Do not run test evaluation. Treat alpha-specific regularization as promising but not yet stable. The next useful NELL_v1 step is either a controlled repeat/seed protocol or a small alpha-specific weight sweep, for example stronger causal entropy/logit weights, before formal test evaluation.
 ```
+
+## 45. 2026-06-04 WN18RR_v1 Alpha-Specific Causal-Only Follow-Up
+
+Code update:
+
+```text
+f90fb26 Add configurable validation selection metric
+```
+
+New parameter:
+
+```bash
+--selection_metric {auc,auc_pr}
+```
+
+Default remains `auc`, preserving the old baseline and checkpoint-selection behavior. Use `--selection_metric auc_pr` for future Causal-GraIL runs where AUC-PR is the primary validation criterion.
+
+WN18RR_v1 alpha-specific causal-only, batch_size=16:
+
+```text
+experiment diag_v5_wn18rr_v1_alpha_specific_causal_only_20ep
+best validation AUC 0.9172
+best observed validation AUC-PR 0.9174
+test not run
+```
+
+Final mask health was good:
+
+```text
+epoch20 raw=0.4564/0.4326
+epoch20 entropy=0.5152/0.6833
+epoch20 budget_loss=0.0731
+epoch20 overlap_loss=0.1931
+```
+
+WN18RR_v1 alpha-specific causal-only, batch_size=4, AUC-PR selection:
+
+```text
+experiment diag_v5_wn18rr_v1_alpha_specific_aucpr_select_bs4_5ep
+best validation AUC/AUC-PR 0.9294/0.9266
+test not run
+```
+
+Mask health was also good:
+
+```text
+epoch1 raw=0.4187/0.4337 entropy=0.5267/0.6834
+epoch3 raw=0.4328/0.4337 entropy=0.6284/0.6841
+epoch5 raw=0.5437/0.4250 entropy=0.5666/0.6811
+```
+
+Comparison:
+
+```text
+same-env WN18RR_v1 baseline AUC-PR 0.9350
+paper WN18RR_v1 AUC-PR target 0.9432
+```
+
+Conclusion:
+
+```text
+Alpha-specific causal-only regularization solves or strongly mitigates WN18RR_v1 mask collapse, but does not recover enough validation performance. Do not run WN18RR_v1 test for these causal-only configurations.
+```
+
+Next action:
+
+```text
+Try a strictly controlled, very small effect-loss reintroduction only after mask warmup, selected by AUC-PR. Start with effect_loss_weight around 0.005-0.01, warmup 3, ramp 5, clamp 10. Abort if alpha entropy drops below about 0.15, shortcut entropy collapses, or score means/norms explode.
+```
