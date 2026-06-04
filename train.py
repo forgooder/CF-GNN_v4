@@ -117,6 +117,10 @@ if __name__ == '__main__':
                         help="Gradient path used only for effect loss; default full preserves existing behavior")
     parser.add_argument("--effect_score_clamp", type=float, default=0.0,
                         help="Optional absolute clamp for training-time effect-loss scores; <=0 disables")
+    parser.add_argument("--masked_aux_gradient_mode", type=str,
+                        choices=['full', 'mask_only'],
+                        default='full',
+                        help="Gradient path for masked causal/shortcut auxiliary losses; default full preserves existing behavior")
     parser.add_argument("--shortcut_penalty_weight", type=float, default=0.0,
                         help="Optional penalty that discourages shortcut scores from separating positive and negative samples")
     parser.add_argument("--mask_sparsity_weight", type=float, default=0.0,

@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+from contextlib import contextmanager
 
 from sklearn import metrics
 from utils.score_utils import SCORE_MODE_CHOICES, select_score
@@ -219,9 +220,37 @@ class Trainer():
 
         return effect_pos, effect_neg
 
+    @contextmanager
+    def freeze_non_mask_parameters(self):
+        changed_params = []
+        for name, param in self.graph_classifier.named_parameters():
+            if name.startswith('causal_mask_generator.'):
+                continue
+            if param.requires_grad:
+                param.requires_grad_(False)
+                changed_params.append(param)
+        try:
+            yield
+        finally:
+            for param in changed_params:
+                param.requires_grad_(True)
+
+    def causal_training_outputs(self, data):
+        aux_gradient_mode = getattr(self.params, 'masked_aux_gradient_mode', 'full')
+        if aux_gradient_mode == 'full':
+            return self.graph_classifier(data, mode='all')
+        if aux_gradient_mode != 'mask_only':
+            raise ValueError(f"Unknown masked_aux_gradient_mode: {aux_gradient_mode}")
+
+        original_score = self.graph_classifier(data, mode='original')
+        with self.freeze_non_mask_parameters():
+            outputs = self.graph_classifier(data, mode='all')
+        outputs['original'] = original_score
+        return outputs
+
     def causal_training_step(self, data_pos, data_neg):
-        outputs_pos = self.graph_classifier(data_pos, mode='all')
-        outputs_neg = self.graph_classifier(data_neg, mode='all')
+        outputs_pos = self.causal_training_outputs(data_pos)
+        outputs_neg = self.causal_training_outputs(data_neg)
 
         original_loss = self.ranking_loss(outputs_pos['original'], outputs_neg['original'])
         causal_loss = self.ranking_loss(outputs_pos['causal'], outputs_neg['causal'])
@@ -250,6 +279,7 @@ class Trainer():
             'effect_loss_weight': effect_loss_weight,
             'effect_loss_ramp_factor': effect_loss_ramp_factor,
             'effect_score_clamp': getattr(self.params, 'effect_score_clamp', 0.0),
+            'masked_aux_gradient_mode': 0.0 if getattr(self.params, 'masked_aux_gradient_mode', 'full') == 'full' else 1.0,
             'mask_reg_loss': mask_reg_loss.item(),
             'shortcut_penalty': shortcut_loss.item(),
             'total_loss': total_loss.item(),

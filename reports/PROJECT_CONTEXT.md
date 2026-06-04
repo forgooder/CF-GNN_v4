@@ -3642,3 +3642,47 @@ Updated WN18RR judgment:
 ```text
 WN18RR remains the hard negative case. Existing default-off shortcut score suppression is not enough and moves mask overlap in the wrong direction. The next WN18RR work should inspect whether auxiliary masked losses should have reduced or separated gradients into the shared scorer/GNN, instead of adding stronger shortcut penalties.
 ```
+
+## 58. 2026-06-04 Mask-Only Auxiliary Gradient Code Smoke
+
+Code change:
+
+```text
+Added --masked_aux_gradient_mode {full,mask_only}
+Default full preserves existing behavior.
+mask_only freezes non-mask graph-classifier parameters during masked causal/shortcut auxiliary forward passes, while original score/loss remains normal.
+```
+
+Verification:
+
+```bash
+python -m py_compile train.py managers/trainer.py model/dgl/graph_classifier.py model/dgl/causal_mask.py utils/score_utils.py
+python train.py --help | rg "masked_aux_gradient_mode|effect_gradient_mode|shortcut_penalty"
+```
+
+Smoke:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e smoke_v5_masked_aux_mask_only \
+  --gpu 0 --use_causal_training --num_epochs 1 --batch_size 4 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --masked_aux_gradient_mode mask_only \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr --log_all_score_modes_validation
+```
+
+Smoke result:
+
+```text
+Best validation original AUC/AUC-PR 0.8506/0.9004
+epoch1 raw=0.4999/0.4278 entropy=0.5736/0.6816 budget=0.0557 overlap=0.2120
+```
+
+Conclusion:
+
+```text
+Code smoke passed. The new mask-only auxiliary gradient mode is default-off, compiles, appears in CLI help, runs forward/backward, and logs expected diagnostics. It is not a performance result. Next step is an 8-epoch WN18RR_v1 validation-only diagnostic.
+```
