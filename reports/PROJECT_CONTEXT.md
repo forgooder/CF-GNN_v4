@@ -3162,3 +3162,58 @@ Current WN18RR_v1 judgment:
 ```text
 v5 alpha-specific regularization materially improves mask health, but current objectives do not produce stable WN18RR_v1 gains over same-environment GRAIL. Move on to WN18RR_v2/v4 with all-mode validation logging or start v6 objective design if the pattern repeats.
 ```
+
+## 51. 2026-06-04 WN18RR_v2 Original-Score All-Mode Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v2 -e diag_v5_wn18rr_v2_original_score_w05_allmodes_5ep \
+  --gpu 0 \
+  --use_causal_training \
+  --num_epochs 5 \
+  --batch_size 16 \
+  --causal_loss_weight 0.5 \
+  --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 \
+  --mask_budget_weight 0.05 \
+  --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 \
+  --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 \
+  --causal_mask_target 0.45 \
+  --shortcut_mask_target 0.45 \
+  --score_mode original \
+  --selection_metric auc_pr \
+  --log_all_score_modes_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.9281/0.9272
+```
+
+All-mode snapshot at selected validation point:
+
+```text
+original AUC/AUC-PR 0.9281/0.9272
+causal AUC/AUC-PR 0.9280/0.9270
+shortcut AUC/AUC-PR 0.9275/0.9261
+effect AUC/AUC-PR 0.6170/0.7565
+causal_plus_effect AUC/AUC-PR 0.8384/0.8919
+```
+
+Mask health:
+
+```text
+epoch4 raw=0.6459/0.4180 entropy=0.5402/0.6790 budget=0.0838 overlap=0.2667
+epoch5 raw=0.6088/0.4211 entropy=0.5596/0.6801 budget=0.0728 overlap=0.2529
+```
+
+Conclusion:
+
+```text
+Negative validation result. The alpha-specific causal-only path prevents the earlier WN18RR_v2 effect-loss collapse, but validation AUC-PR 0.9272 remains below same-env baseline 0.9479 and paper target 0.9418. No test was run. This reinforces that v5's current mask-health improvements are not translating into stronger WN18RR scoring.
+```
