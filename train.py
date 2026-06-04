@@ -147,6 +147,8 @@ if __name__ == '__main__':
                         help="Optional JSON file with relation-aware causal/shortcut mask target ratios")
     parser.add_argument("--score_mode", type=str, choices=SCORE_MODE_CHOICES, default='original',
                         help="Score used for validation and training AUC logging")
+    parser.add_argument("--selection_metric", type=str, choices=['auc', 'auc_pr'], default='auc',
+                        help="Validation metric used to save the best checkpoint; default preserves existing AUC selection")
 
     # Data processing pipeline params
     parser.add_argument("--max_links", type=int, default=1000000,

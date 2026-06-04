@@ -308,9 +308,11 @@ class Trainer():
                 result = self.valid_evaluator.eval()
                 logging.info('\nPerformance:' + str(result) + 'in ' + str(time.time() - tic))
 
-                if result['auc'] >= self.best_metric:
+                selection_metric = getattr(self.params, 'selection_metric', 'auc')
+                current_metric = result[selection_metric]
+                if current_metric >= self.best_metric:
                     self.save_classifier()
-                    self.best_metric = result['auc']
+                    self.best_metric = current_metric
                     self.not_improved_count = 0
 
                 else:
@@ -318,7 +320,7 @@ class Trainer():
                     if self.not_improved_count > self.params.early_stop:
                         logging.info(f"Validation performance didn\'t improve for {self.params.early_stop} epochs. Training stops.")
                         break
-                self.last_metric = result['auc']
+                self.last_metric = current_metric
 
         auc = metrics.roc_auc_score(all_labels, all_scores)
         auc_pr = metrics.average_precision_score(all_labels, all_scores)
@@ -335,7 +337,8 @@ class Trainer():
             time_start = time.time()
             loss, auc, auc_pr, weight_norm, stats = self.train_epoch()
             time_elapsed = time.time() - time_start
-            logging.info(f'Epoch {epoch} with loss: {loss}, training auc: {auc}, training auc_pr: {auc_pr}, best validation AUC: {self.best_metric}, weight_norm: {weight_norm} in {time_elapsed}')
+            selection_metric = getattr(self.params, 'selection_metric', 'auc')
+            logging.info(f'Epoch {epoch} with loss: {loss}, training auc: {auc}, training auc_pr: {auc_pr}, best validation {selection_metric}: {self.best_metric}, weight_norm: {weight_norm} in {time_elapsed}')
             if stats:
                 logging.info('Causal training stats: ' + str(stats))
 
@@ -360,4 +363,4 @@ class Trainer():
 
     def save_classifier(self):
         torch.save(self.graph_classifier, os.path.join(self.params.exp_dir, 'best_graph_classifier.pth'))  # Does it overwrite or fuck with the existing file?
-        logging.info('Better models found w.r.t accuracy. Saved it!')
+        logging.info('Better model found w.r.t validation metric. Saved it!')
