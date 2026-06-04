@@ -2972,3 +2972,58 @@ Next action:
 ```text
 Do not test. The next WN18RR_v1 diagnostic should reduce causal_loss_weight, because full causal loss appears to keep masks healthy but weakens validation scoring. Try causal_loss_weight 0.3-0.5 with effect_loss_weight 0.0 and selection_metric auc_pr.
 ```
+
+## 48. 2026-06-04 WN18RR_v1 Lower Causal-Loss Diagnostics
+
+Two causal-only WN18RR_v1 runs tested lower causal-loss pressure while keeping alpha-specific regularization and AUC-PR checkpoint selection.
+
+Shared settings:
+
+```text
+effect_loss_weight 0.0
+mask_gamma 0.5
+mask_budget_weight 0.05
+mask_overlap_weight 0.01
+mask_logit_l2_weight 0.001
+causal_mask_entropy_floor_weight 0.1
+causal_mask_logit_l2_weight 0.002
+mask_entropy_floor 0.2
+causal/shortcut targets 0.45/0.45
+score_mode causal_plus_effect
+selection_metric auc_pr
+```
+
+Results:
+
+```text
+causal_loss_weight 0.5
+experiment diag_v5_wn18rr_v1_alpha_specific_causal_w05_aucpr_8ep
+best validation AUC/AUC-PR 0.9179/0.9194
+test not run
+
+causal_loss_weight 0.3
+experiment diag_v5_wn18rr_v1_alpha_specific_causal_w03_aucpr_8ep
+best validation AUC/AUC-PR 0.9161/0.9187
+test not run
+```
+
+Mask checkpoints:
+
+```text
+w0.5 epoch4 raw=0.5778/0.4215 entropy=0.5887/0.6801
+w0.5 epoch8 raw=0.6499/0.4171 entropy=0.5715/0.6788
+w0.3 epoch4 raw=0.7345/0.4117 entropy=0.5197/0.6770
+w0.3 epoch8 raw=0.6286/0.4195 entropy=0.6065/0.6798
+```
+
+Conclusion:
+
+```text
+Lowering causal_loss_weight does not recover WN18RR_v1 validation performance. Masks remain mostly healthy, but AUC-PR stays around 0.919, well below same-env baseline AUC-PR 0.9350. Do not run test evaluation for these configurations.
+```
+
+Next action:
+
+```text
+Pause WN18RR_v1 direct scalar sweeps. The next useful code improvement is a default-off validation diagnostic that evaluates all score modes from one checkpoint/pass, so future runs can compare original/causal/shortcut/effect/causal_plus_effect without separate training runs. This does not change metric formulas or baseline behavior.
+```
