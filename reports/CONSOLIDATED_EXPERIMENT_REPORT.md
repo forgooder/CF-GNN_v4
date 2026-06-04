@@ -1,6 +1,6 @@
 # Causal-GraIL v5 Consolidated Experiment Report
 
-Updated: 2026-06-04 19:49 CST
+Updated: 2026-06-04 19:56 CST
 
 ## Scope
 
@@ -204,6 +204,33 @@ Next WN18RR step:
 
 ```text
 Run a validation-only WN18RR_v1 mainline diagnostic with relation metrics enabled. Use relation-level validation only to design future relation-aware budgets/objectives; do not run WN18RR test unless validation clearly qualifies.
+```
+
+Completed relation-metrics diagnostic:
+
+```text
+Experiment: diag_v5_wn18rr_v1_relation_metrics_original_w05_8ep
+Code: 63bb624
+Best validation original AUC/AUC-PR: 0.9180/0.9206
+No test run.
+Final mask: raw=0.5989/0.4215, entropy=0.5778/0.6802, budget=0.0620, overlap=0.2510
+```
+
+Best-point relation metrics:
+
+```text
+_hypernym: support=336, AUC-PR=0.7069
+_has_part: support=64, AUC-PR=0.6877
+_synset_domain_topic_of: support=14, AUC-PR=0.7857
+_also_see: support=52, AUC-PR=0.8846
+_verb_group: support=58, AUC-PR=0.9535
+_derivationally_related_form: support=732, AUC-PR=0.9566
+```
+
+Interpretation:
+
+```text
+WN18RR_v1 aggregate failure is concentrated in relation families where GraIL-style enclosing subgraphs are likely ambiguous for hierarchy/part-whole reasoning, especially _hypernym and _has_part. Current v5 mask regularization keeps masks healthy but does not repair these relation-specific ranking failures.
 ```
 
 ## Files Kept After Consolidation

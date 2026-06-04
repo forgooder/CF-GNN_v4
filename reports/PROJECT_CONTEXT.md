@@ -3802,3 +3802,59 @@ Conclusion:
 ```text
 Relation-level diagnostics are working and should be used before designing relation-aware mask budgets/objectives for WN18RR. This is a diagnostic smoke, not a performance result.
 ```
+
+## 61. 2026-06-04 WN18RR_v1 Relation-Metrics Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_relation_metrics_original_w05_8ep \
+  --gpu 0 --use_causal_training --num_epochs 8 --batch_size 16 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --log_all_score_modes_validation --log_relation_metrics_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.9180/0.9206
+```
+
+All-mode at best point:
+
+```text
+original AUC/AUC-PR 0.9180/0.9206
+causal AUC/AUC-PR 0.9176/0.9202
+shortcut AUC/AUC-PR 0.9176/0.9198
+effect AUC/AUC-PR 0.7556/0.8290
+causal_plus_effect AUC/AUC-PR 0.9183/0.9190
+```
+
+Mask:
+
+```text
+epoch6 raw=0.5833/0.4218 entropy=0.4921/0.6798 budget=0.0972 overlap=0.2426
+epoch8 raw=0.5989/0.4215 entropy=0.5778/0.6802 budget=0.0620 overlap=0.2510
+```
+
+Relation metrics at best point:
+
+```text
+_hypernym support=336 AUC/AUC-PR=0.7138/0.7069
+_has_part support=64 AUC/AUC-PR=0.7417/0.6877
+_synset_domain_topic_of support=14 AUC/AUC-PR=0.7857/0.7857
+_also_see support=52 AUC/AUC-PR=0.8846/0.8846
+_verb_group support=58 AUC/AUC-PR=0.9512/0.9535
+_derivationally_related_form support=732 AUC/AUC-PR=0.9548/0.9566
+```
+
+Conclusion:
+
+```text
+Negative validation result, but useful diagnosis. The aggregate WN18RR_v1 gap is concentrated in _hypernym and _has_part, not uniformly across relations. Masks are healthy, so the next WN18RR step should be relation-aware objective/budget design or relation-specific analysis, not another global mask scalar sweep. Do not test.
+```
