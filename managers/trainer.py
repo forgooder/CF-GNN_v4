@@ -340,6 +340,9 @@ class Trainer():
                 if getattr(self.params, 'log_all_score_modes_validation', False):
                     all_mode_result = self.valid_evaluator.eval_score_modes(SCORE_MODE_CHOICES)
                     logging.info('\nValidation all score modes:' + str(all_mode_result))
+                if getattr(self.params, 'log_relation_metrics_validation', False):
+                    relation_result = self.valid_evaluator.eval_by_relation(getattr(self.params, 'score_mode', 'original'))
+                    logging.info('\nValidation relation metrics:' + str(relation_result))
 
                 selection_metric = getattr(self.params, 'selection_metric', 'auc')
                 current_metric = result[selection_metric]

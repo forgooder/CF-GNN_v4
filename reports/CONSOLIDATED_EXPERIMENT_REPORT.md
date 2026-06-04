@@ -1,6 +1,6 @@
 # Causal-GraIL v5 Consolidated Experiment Report
 
-Updated: 2026-06-04 16:45 CST
+Updated: 2026-06-04 19:49 CST
 
 ## Scope
 
@@ -33,6 +33,7 @@ Important default-off additions now available:
 --effect_gradient_mode
 --effect_score_clamp
 --masked_aux_gradient_mode {full,mask_only}
+--log_relation_metrics_validation
 ```
 
 Baseline path remains default-preserving: causal training is only active with `--use_causal_training`, and new parameters are default-off or default-compatible.
@@ -166,6 +167,44 @@ The next useful optimization should focus on WN18RR without using test feedback:
 2. Try relation-aware mask targets if they can be justified from training/validation diagnostics, not test results.
 3. Rework effect objective only if it avoids prior instability: no scorer explosion, no shortcut entropy collapse, no high-overlap budget domination.
 4. Keep NELL/FB237 test results fixed; use validation-only repeats or ablations if needed.
+
+## Latest Optimization Addendum
+
+Added default-off validation diagnostics:
+
+```text
+--log_relation_metrics_validation
+```
+
+This logs validation AUC/AUC-PR grouped by target relation for the selected score mode. It does not change metric computation, checkpoint selection, negative sampling, subgraph extraction, data, or baseline behavior.
+
+Smoke:
+
+```text
+Experiment: smoke_v5_relation_metrics_validation
+Dataset: WN18RR_v1
+Code state: 2a8db3e + local relation-metrics patch
+Best smoke validation original AUC/AUC-PR: 0.8439/0.8913
+Mask: raw=0.4526/0.4312, entropy=0.5520/0.6824
+```
+
+Initial relation-level observation from WN18RR_v1 smoke:
+
+```text
+_hypernym is the dominant weak relation:
+support=336, positives=168, negatives=168, AUC-PR about 0.696-0.699 in early smoke validation.
+
+Stronger relations in the same smoke include:
+_derivationally_related_form support=732, AUC-PR about 0.946-0.973
+_also_see support=52, AUC-PR about 0.885-0.969
+_verb_group support=58, AUC-PR about 0.935-0.938
+```
+
+Next WN18RR step:
+
+```text
+Run a validation-only WN18RR_v1 mainline diagnostic with relation metrics enabled. Use relation-level validation only to design future relation-aware budgets/objectives; do not run WN18RR test unless validation clearly qualifies.
+```
 
 ## Files Kept After Consolidation
 

@@ -98,3 +98,54 @@ class Evaluator():
             }
 
         return results
+
+    def eval_by_relation(self, score_mode=None):
+        score_mode = score_mode or getattr(self.params, 'score_mode', 'original')
+        relation_scores = {}
+        dataloader = DataLoader(self.data, batch_size=self.params.batch_size, shuffle=False, num_workers=self.params.num_workers, collate_fn=self.params.collate_fn)
+
+        self.graph_classifier.eval()
+        with torch.no_grad():
+            for b_idx, batch in enumerate(dataloader):
+                data_pos, targets_pos, data_neg, targets_neg = self.params.move_batch_to_device(batch, self.params.device)
+                score_pos = forward_for_score(self.graph_classifier, data_pos, score_mode).view(-1).detach().cpu()
+                score_neg = forward_for_score(self.graph_classifier, data_neg, score_mode).view(-1).detach().cpu()
+                rel_pos = data_pos[1].view(-1).detach().cpu().tolist()
+                rel_neg = data_neg[1].view(-1).detach().cpu().tolist()
+
+                for rel_id, score, label in zip(rel_pos, score_pos.tolist(), targets_pos.detach().cpu().tolist()):
+                    bucket = relation_scores.setdefault(int(rel_id), {'scores': [], 'labels': []})
+                    bucket['scores'].append(float(score))
+                    bucket['labels'].append(int(label))
+                for rel_id, score, label in zip(rel_neg, score_neg.tolist(), targets_neg.detach().cpu().tolist()):
+                    bucket = relation_scores.setdefault(int(rel_id), {'scores': [], 'labels': []})
+                    bucket['scores'].append(float(score))
+                    bucket['labels'].append(int(label))
+
+        id2relation = getattr(self.data, 'id2relation', {})
+        results = []
+        for rel_id, bucket in relation_scores.items():
+            labels = bucket['labels']
+            predicted_scores = bucket['scores']
+            positives = int(sum(labels))
+            negatives = int(len(labels) - positives)
+            if positives == 0 or negatives == 0:
+                auc = None
+                auc_pr = None
+            else:
+                auc = float(metrics.roc_auc_score(labels, predicted_scores))
+                auc_pr = float(metrics.average_precision_score(labels, predicted_scores))
+            results.append({
+                'rel_id': int(rel_id),
+                'relation': id2relation.get(int(rel_id), str(rel_id)),
+                'support': int(len(labels)),
+                'positives': positives,
+                'negatives': negatives,
+                'auc': auc,
+                'auc_pr': auc_pr
+            })
+
+        return sorted(
+            results,
+            key=lambda item: (-1.0 if item['auc_pr'] is None else item['auc_pr'], item['rel_id'])
+        )

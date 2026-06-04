@@ -3748,3 +3748,57 @@ Updated WN18RR judgment:
 ```text
 WN18RR_v1 has now failed with healthy masks under causal-only alpha-specific regularization, shortcut score penalty, and mask-only auxiliary gradients. The remaining issue is likely objective/data interaction rather than v4-style mask collapse. Next useful WN18RR work should examine relation-aware behavior or a more fundamental effect objective redesign; do not run test on current WN variants.
 ```
+
+## 60. 2026-06-04 Relation-Level Validation Diagnostics
+
+Code change:
+
+```text
+Added --log_relation_metrics_validation
+Default off.
+Logs validation AUC/AUC-PR by target relation for the selected score mode.
+Does not affect metric computation, selection metric, data, negative sampling, subgraph extraction, or baseline behavior.
+```
+
+Verification:
+
+```bash
+python -m py_compile train.py managers/trainer.py managers/evaluator.py
+python train.py --help | rg "log_relation_metrics_validation|log_all_score_modes_validation"
+```
+
+Smoke:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e smoke_v5_relation_metrics_validation \
+  --gpu 0 --use_causal_training --num_epochs 1 --batch_size 4 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr --log_relation_metrics_validation
+```
+
+Smoke result:
+
+```text
+Best validation original AUC/AUC-PR 0.8439/0.8913
+epoch1 raw=0.4526/0.4312 entropy=0.5520/0.6824 budget=0.0584 overlap=0.1915
+```
+
+Initial relation observation:
+
+```text
+_hypernym is the largest weak WN18RR_v1 validation relation:
+support=336, positives=168, negatives=168, AUC-PR about 0.696-0.699 in smoke validation.
+
+_derivationally_related_form is high-support but much stronger:
+support=732, AUC-PR about 0.946-0.973.
+```
+
+Conclusion:
+
+```text
+Relation-level diagnostics are working and should be used before designing relation-aware mask budgets/objectives for WN18RR. This is a diagnostic smoke, not a performance result.
+```
