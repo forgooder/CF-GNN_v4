@@ -3364,3 +3364,93 @@ Current overall judgment:
 ```text
 v5 alpha-specific causal-only training with logit regularization materially mitigates v4 mask collapse. It is negative on WN18RR_v1/v2/v4 under original-score/all-mode validation and one WN18RR_v1 test, but positive on NELL_v1 with a large formal test improvement. The next priority should be a stability check on NELL_v1 or FB237_v1 validation, not more WN18RR scalar tuning.
 ```
+
+## 54. 2026-06-04 FB237_v1 Original-Score Formal Test
+
+First attempted uppercase dataset name:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d FB237_v1 -e diag_v5_fb237_v1_original_score_w05_allmodes_10ep \
+  --gpu 0 --use_causal_training --num_epochs 10 --batch_size 16 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr --log_all_score_modes_validation
+```
+
+It failed because the local data directory is `data/fb237_v1`, not `data/FB237_v1`.
+
+Rerun:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d fb237_v1 -e diag_v5_fb237_v1_original_score_w05_allmodes_10ep_lc \
+  --gpu 0 --use_causal_training --num_epochs 10 --batch_size 16 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr --log_all_score_modes_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.8443/0.8632
+```
+
+All-mode snapshot at best validation point:
+
+```text
+original AUC/AUC-PR 0.8443/0.8632
+causal AUC/AUC-PR 0.8410/0.8615
+shortcut AUC/AUC-PR 0.8417/0.8638
+effect AUC/AUC-PR 0.6777/0.7215
+causal_plus_effect AUC/AUC-PR 0.8356/0.8531
+```
+
+Mask health:
+
+```text
+epoch5 raw=0.5819/0.4221 entropy=0.3507/0.6792 budget=0.1501 overlap=0.2434
+epoch10 raw=0.5376/0.4259 entropy=0.4054/0.6809 budget=0.1241 overlap=0.2259
+```
+
+Test:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u test_auc.py -d fb237_v1 -e diag_v5_fb237_v1_original_score_w05_allmodes_10ep_lc --gpu 0 --score_mode original
+CUDA_VISIBLE_DEVICES=1 python -u test_ranking.py -d fb237_v1 -e diag_v5_fb237_v1_original_score_w05_allmodes_10ep_lc --score_mode original
+```
+
+Test result:
+
+```text
+AUC 0.8396
+AUC-PR 0.8546
+MRR 0.5575
+Hits@1 0.4492
+Hits@5 0.6829
+Hits@10 0.7622
+```
+
+Comparison:
+
+```text
+Same-env FB237_v1 baseline: AUC 0.7938, AUC-PR 0.8349, MRR 0.4862, Hits@1 0.4024, Hits@10 0.6537
+Paper FB15k-237 v1: AUC-PR 0.8469, Hits@10 0.6415
+```
+
+Conclusion:
+
+```text
+Positive formal FB237_v1 result. The run exceeds same-env baseline on AUC, AUC-PR, MRR, Hits@1, and Hits@10, and exceeds paper AUC-PR/Hits@10 targets. Masks remain non-collapsed. Together with the NELL_v1 result, v5 now has credible positive evidence on two non-WN datasets, while WN18RR remains negative despite healthier masks.
+```
+
+Updated overall judgment:
+
+```text
+The current v5 mainline is effective on NELL_v1 and FB237_v1 under formal validation-selected tests, and ineffective on WN18RR_v1/v2/v4 so far. It does mitigate v4 mask collapse across datasets. The next priority is a stability repeat for NELL_v1 or FB237_v1 without using test feedback for tuning, plus a structural rethink for WN18RR rather than more scalar sweeps.
+```
