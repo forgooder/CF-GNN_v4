@@ -1009,6 +1009,59 @@ Conclusion:
 Negative smoke. Simple head/tail product and distance features do not fix WN18RR_v1 and substantially hurt aggregate validation. Do not run a full diagnostic or test this configuration. The result further narrows WN failure: local pairwise scorer features can help some relation families but do not repair _hypernym, the dominant weak relation.
 ```
 
+## Relation Score Stats Diagnostic
+
+Code change:
+
+```text
+Added default-off --log_relation_score_stats_validation.
+When enabled, validation logs relation-level positive/negative score means/stds, mean score gap, paired margin percentiles, and paired positive-greater-than-negative rate when positive/negative counts match.
+Default behavior is unchanged; checkpoint selection, data, negative sampling, subgraph extraction, and metric formulas are unchanged.
+```
+
+Verification:
+
+```bash
+conda run -n cignn_dgl python -m py_compile managers/evaluator.py managers/trainer.py train.py
+conda run -n cignn_dgl python train.py --help | rg "log_relation_score_stats_validation|log_relation_metrics_validation|log_relation_mask_validation"
+```
+
+Smoke:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 conda run -n cignn_dgl python -u train.py -d WN18RR_v1 -e smoke_v5_relation_score_stats_validation \
+  --gpu 0 --use_causal_training --num_epochs 1 --batch_size 4 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --log_relation_metrics_validation --log_relation_score_stats_validation --log_relation_mask_validation
+```
+
+Smoke result:
+
+```text
+Best validation original AUC/AUC-PR: 0.9038/0.9116
+No test run; no 8-epoch follow-up.
+Epoch1 final raw=0.4463/0.4311, entropy=0.5012/0.6821, overlap=0.1887.
+```
+
+Relation score observations:
+
+```text
+At the best validation point, _hypernym had AUC-PR=0.6851, score_gap=8.3145, margin_p10=0.0, margin_p50=0.0, and pos_gt_neg_rate=0.4583.
+_has_part was much healthier in the same validation point: AUC-PR=0.9190, score_gap=9.5612, margin_p50=3.8275, pos_gt_neg_rate=0.9375.
+_derivationally_related_form remained strong: AUC-PR=0.9570, score_gap=40.1381, margin_p50=43.7551, pos_gt_neg_rate=0.9180.
+```
+
+Conclusion:
+
+```text
+Code smoke passed and gives a sharper WN18RR_v1 diagnosis. _hypernym is not merely suffering from a low mean positive score; many paired positive/negative examples are tied or non-separable by the current scorer, with median margin exactly 0 and pos_gt_neg_rate below 0.5. This supports next diagnostics around relation-specific margin/separation or score calibration on validation, not more mask-budget or overlap sweeps. Do not test this smoke.
+```
+
 ## Files Kept After Consolidation
 
 ```text

@@ -154,6 +154,66 @@ class Evaluator():
             key=lambda item: (-1.0 if item['auc_pr'] is None else item['auc_pr'], item['rel_id'])
         )
 
+    def eval_score_stats_by_relation(self, score_mode=None):
+        score_mode = score_mode or getattr(self.params, 'score_mode', 'original')
+        relation_scores = {}
+        dataloader = DataLoader(self.data, batch_size=self.params.batch_size, shuffle=False, num_workers=self.params.num_workers, collate_fn=self.params.collate_fn)
+
+        self.graph_classifier.eval()
+        with torch.no_grad():
+            for b_idx, batch in enumerate(dataloader):
+                data_pos, targets_pos, data_neg, targets_neg = self.params.move_batch_to_device(batch, self.params.device)
+                score_pos = forward_for_score(self.graph_classifier, data_pos, score_mode).view(-1).detach().cpu()
+                score_neg = forward_for_score(self.graph_classifier, data_neg, score_mode).view(-1).detach().cpu()
+                rel_pos = data_pos[1].view(-1).detach().cpu().tolist()
+                rel_neg_tensor = data_neg[1].view(-1).detach().cpu()
+                if len(rel_neg_tensor) != len(score_neg):
+                    repeat_factor = int(len(score_neg) / max(1, len(rel_neg_tensor)))
+                    rel_neg_tensor = rel_neg_tensor.repeat_interleave(repeat_factor)
+                rel_neg = rel_neg_tensor.tolist()
+
+                for rel_id, score in zip(rel_pos, score_pos.tolist()):
+                    bucket = relation_scores.setdefault(int(rel_id), {'pos_scores': [], 'neg_scores': []})
+                    bucket['pos_scores'].append(float(score))
+                for rel_id, score in zip(rel_neg, score_neg.tolist()):
+                    bucket = relation_scores.setdefault(int(rel_id), {'pos_scores': [], 'neg_scores': []})
+                    bucket['neg_scores'].append(float(score))
+
+        id2relation = getattr(self.data, 'id2relation', {})
+        results = []
+        for rel_id, bucket in relation_scores.items():
+            pos_scores = np.asarray(bucket['pos_scores'], dtype=np.float64)
+            neg_scores = np.asarray(bucket['neg_scores'], dtype=np.float64)
+            pos_mean = float(pos_scores.mean()) if len(pos_scores) else None
+            neg_mean = float(neg_scores.mean()) if len(neg_scores) else None
+            score_gap = None if pos_mean is None or neg_mean is None else pos_mean - neg_mean
+            result = {
+                'rel_id': int(rel_id),
+                'relation': id2relation.get(int(rel_id), str(rel_id)),
+                'positives': int(len(pos_scores)),
+                'negatives': int(len(neg_scores)),
+                'pos_mean': pos_mean,
+                'pos_std': float(pos_scores.std()) if len(pos_scores) else None,
+                'neg_mean': neg_mean,
+                'neg_std': float(neg_scores.std()) if len(neg_scores) else None,
+                'score_gap': score_gap
+            }
+            if len(pos_scores) and len(pos_scores) == len(neg_scores):
+                margins = pos_scores - neg_scores
+                result.update({
+                    'margin_mean': float(margins.mean()),
+                    'margin_p10': float(np.percentile(margins, 10)),
+                    'margin_p50': float(np.percentile(margins, 50)),
+                    'margin_p90': float(np.percentile(margins, 90)),
+                    'pos_gt_neg_rate': float((margins > 0).mean())
+                })
+            results.append(result)
+
+        return sorted(
+            results,
+            key=lambda item: (float('inf') if item['score_gap'] is None else item['score_gap'], item['rel_id'])
+        )
+
     def _add_relation_mask_stats(self, relation_masks, outputs):
         rel_labels = outputs.get('target_rel_labels')
         if rel_labels is None:
