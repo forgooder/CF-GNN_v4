@@ -1062,6 +1062,57 @@ Conclusion:
 Code smoke passed and gives a sharper WN18RR_v1 diagnosis. _hypernym is not merely suffering from a low mean positive score; many paired positive/negative examples are tied or non-separable by the current scorer, with median margin exactly 0 and pos_gt_neg_rate below 0.5. This supports next diagnostics around relation-specific margin/separation or score calibration on validation, not more mask-budget or overlap sweeps. Do not test this smoke.
 ```
 
+## Relation Score Tie-Rate Diagnostic
+
+Code change:
+
+```text
+Extended --log_relation_score_stats_validation with paired margin_le0_rate and margin_tie_rate.
+Default behavior remains unchanged because the logger is still off by default.
+```
+
+Verification:
+
+```bash
+conda run -n cignn_dgl python -m py_compile managers/evaluator.py managers/trainer.py train.py
+```
+
+Smoke:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 conda run -n cignn_dgl python -u train.py -d WN18RR_v1 -e smoke_v5_relation_score_tie_stats_validation \
+  --gpu 0 --use_causal_training --num_epochs 1 --batch_size 4 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --log_relation_metrics_validation --log_relation_score_stats_validation --log_relation_mask_validation
+```
+
+Smoke result:
+
+```text
+Best validation original AUC/AUC-PR: 0.8552/0.9032
+No test run; no 8-epoch follow-up.
+Epoch1 final raw=0.4807/0.4288, entropy=0.5584/0.6819, overlap=0.2027.
+```
+
+Tie-rate observations:
+
+```text
+At both validation points, _hypernym had margin_p50=0.0, pos_gt_neg_rate=0.4583, margin_le0_rate=0.5417, and margin_tie_rate=0.5060.
+_derivationally_related_form stayed well separated at the best point: margin_p50=58.4347, margin_le0_rate=0.0328, margin_tie_rate=0.0273.
+_has_part was unstable in aggregate, but tie_rate dropped from 0.4375 at the first validation to 0.0313 at the best point; its AUC-PR remained only 0.7215 in this smoke.
+```
+
+Conclusion:
+
+```text
+Negative smoke but useful diagnostic. The repeated _hypernym tie_rate around 50% confirms that the WN18RR_v1 dominant weak relation has a paired-score degeneracy under the current graph/scorer representation. This makes further mask-budget/overlap tuning unlikely to solve WN18RR_v1 by itself. The next defensible experiment should target relation-specific margin separation or inspect whether tied _hypernym pairs are structurally indistinguishable in extracted subgraphs, without changing extraction or sampling.
+```
+
 ## Files Kept After Consolidation
 
 ```text

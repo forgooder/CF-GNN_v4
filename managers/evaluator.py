@@ -205,7 +205,9 @@ class Evaluator():
                     'margin_p10': float(np.percentile(margins, 10)),
                     'margin_p50': float(np.percentile(margins, 50)),
                     'margin_p90': float(np.percentile(margins, 90)),
-                    'pos_gt_neg_rate': float((margins > 0).mean())
+                    'pos_gt_neg_rate': float((margins > 0).mean()),
+                    'margin_le0_rate': float((margins <= 0).mean()),
+                    'margin_tie_rate': float((np.abs(margins) <= 1e-6).mean())
                 })
             results.append(result)
 
