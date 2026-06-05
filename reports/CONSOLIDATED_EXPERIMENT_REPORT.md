@@ -182,7 +182,7 @@ Current completed formal-positive count from the ledger:
 
 | Group | v1 | v2 | v3 | v4 |
 |---|---|---|---|---|
-| NELL | Positive formal test | Not yet evaluated | Not yet evaluated | Not yet evaluated |
+| NELL | Positive formal test | Same-env baseline established; v5 validation negative | Not yet evaluated | Not yet evaluated |
 | FB237 | Positive formal test | Not yet evaluated | Not yet evaluated | Not yet evaluated |
 | WN18RR | Negative formal test / negative diagnostics | Negative validation/test diagnostics | Not yet evaluated | Negative validation diagnostics |
 
@@ -194,6 +194,50 @@ Need at least 10 / 12.
 ```
 
 This means the immediate project state is substantially short of the expanded target. The next scheduling priority should shift from only repairing WN18RR_v1 to broad validation coverage of the untested NELL/FB237 variants, while continuing WN-specific work without test-set tuning.
+
+## NELL_v2 Coverage Start
+
+Same-environment baseline:
+
+```text
+Experiment: baseline_nell_v2_sameenv_10ep
+Validation-only, 10 epochs, batch_size=16, original score, selection_metric=auc_pr.
+Best validation AUC/AUC-PR: 0.9613/0.9624 at epoch8.
+No test run yet.
+```
+
+Failed infrastructure attempt:
+
+```text
+Experiment: diag_v5_nell_v2_original_score_w05_allmodes_10ep
+Failure: lmdb.MapResizedError / MDB_MAP_RESIZED during concurrent cache growth.
+Cause: v5 and baseline were both started on first-time nell_v2 LMDB construction.
+Conclusion: do not run first-time cache construction concurrently for the same dataset. This is not a model result.
+```
+
+v5 validation diagnostics:
+
+```text
+Experiment: diag_v5_nell_v2_original_score_w05_allmodes_10ep_rerun
+Stopped after epoch1 because runtime was high and validation was far below baseline.
+Validation original AUC/AUC-PR: 0.8846/0.8968.
+Best all-mode AUC-PR: causal_plus_effect 0.8985.
+Mask state: raw causal/shortcut 0.6434/0.4182, entropy 0.5239/0.6789, overlap 0.2682.
+
+Experiment: diag_v5_nell_v2_original_w05_warm3_ramp2_5ep
+Stopped after epoch1 because warmup did not preserve scoring quality.
+Validation original AUC/AUC-PR: 0.8520/0.8711.
+Mask state: raw causal/shortcut 0.4545/0.4324, entropy 0.6890/0.6839, overlap 0.1965.
+```
+
+Conclusion:
+
+```text
+NELL_v2 is currently negative for v5. The same-env baseline is very strong at validation AUC-PR 0.9624, while both v5 mainline and warmup/ramp diagnostics are far below it.
+Mask collapse is not the immediate problem on NELL_v2; the current causal-training path weakens the scorer.
+Do not run NELL_v2 test for these v5 configs.
+Next broad-coverage work should establish FB237_v2 and NELL_v3/FB237_v3 baselines sequentially, then run v5 validation only after each cache is built.
+```
 
 ## Next Optimization Direction
 

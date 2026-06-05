@@ -4369,3 +4369,46 @@ Conclusion:
 ```text
 Negative smoke. Head/tail interaction features keep masks globally healthy but substantially hurt aggregate WN18RR_v1 validation. _has_part improved to AUC-PR=0.9158 and _also_see to 0.9692 at the second validation point, but _hypernym stayed weak around 0.6909 and aggregate stayed far below same-env AUC-PR 0.9350. Do not run a full diagnostic or test.
 ```
+
+## 2026-06-05 Evening Update: NELL_v2 Broad-Coverage Start
+
+The expanded target is the 12 tasks `NELL_v1-v4`, `FB237_v1-v4`, and `WN18RR_v1-v4`; at least 10/12 should beat same-environment GRAIL baseline credibly. Current formal positives remain only `NELL_v1` and `FB237_v1`.
+
+`NELL_v2` same-environment baseline was established first:
+
+```text
+Experiment: baseline_nell_v2_sameenv_10ep
+Validation-only, 10 epochs, batch_size=16, original score, selection_metric=auc_pr.
+Best validation AUC/AUC-PR: 0.9613/0.9624 at epoch8.
+No test run.
+```
+
+The first concurrent v5 attempt failed during first-time LMDB cache construction:
+
+```text
+Experiment: diag_v5_nell_v2_original_score_w05_allmodes_10ep
+Failure: lmdb.MapResizedError / MDB_MAP_RESIZED.
+Reason: baseline and v5 both wrote/read the same growing `nell_v2` LMDB cache.
+Conclusion: build or reuse cache sequentially for each new dataset variant.
+```
+
+After cache construction, two v5 validation diagnostics were run and stopped after epoch1 because both were far below baseline:
+
+```text
+diag_v5_nell_v2_original_score_w05_allmodes_10ep_rerun
+Validation original AUC/AUC-PR: 0.8846/0.8968.
+Best all-mode AUC-PR: causal_plus_effect 0.8985.
+Mask raw causal/shortcut: 0.6434/0.4182; entropy: 0.5239/0.6789.
+
+diag_v5_nell_v2_original_w05_warm3_ramp2_5ep
+Validation original AUC/AUC-PR: 0.8520/0.8711.
+Mask raw causal/shortcut: 0.4545/0.4324; entropy: 0.6890/0.6839.
+```
+
+Interpretation:
+
+```text
+NELL_v2 is currently negative for v5. This is not a mask-collapse failure: masks are usable or very healthy, but the current causal-training path weakens scoring compared with the strong same-env baseline.
+Do not run test for these NELL_v2 configs.
+Next step: continue broad coverage sequentially, preferably `fb237_v2` baseline then v5 validation, because NELL_v2 shows that v1 success does not automatically transfer.
+```
