@@ -759,6 +759,98 @@ Conclusion:
 Negative validation result. The nonlinear scorer smoke was a false positive under the standard batch_size=16 diagnostic. The MLP scorer increased capacity but did not repair stable WN18RR_v1 relation ranking; _hypernym returned to about 0.70 AUC-PR and validation stayed below same-env baseline. It also introduced score/mask co-adaptation: scorer weight norm and score magnitudes rose while relation-level causal masks oscillated or saturated. Do not test this configuration. If this direction is revisited, it needs explicit scorer regularization or lower-capacity/stronger-dropout validation, not test-set feedback.
 ```
 
+## WN18RR_v1 Low-Capacity Nonlinear Scorer Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_mlp_scorer16_drop03_original_w05_8ep \
+  --gpu 0 --use_causal_training --num_epochs 8 --batch_size 16 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --score_hidden_dim 16 --score_dropout 0.3 \
+  --log_all_score_modes_validation --log_relation_metrics_validation --log_relation_mask_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.9136/0.9186
+Best all-mode observed shortcut AUC/AUC-PR 0.9137/0.9189
+No test run.
+```
+
+Diagnostics:
+
+```text
+Same-env WN18RR_v1 baseline AUC-PR: 0.9350
+First validation point showed alpha closed on many relations: _hypernym causal_raw=0.0226, _has_part causal_raw=0.0101.
+Later masks recovered but weak-relation ranking did not: best-point _hypernym AUC-PR=0.7015, _has_part AUC-PR=0.6877.
+Validation later fell to original AUC/AUC-PR 0.9159/0.9125.
+Score magnitude still drifted: original_score_mean reached 78.28 at epoch6, and weight_norm reached 208.0 at epoch8.
+```
+
+Conclusion:
+
+```text
+Negative validation result. Reducing nonlinear scorer capacity and increasing dropout did not beat the linear scorer mainline or same-env baseline. It also did not reliably control scorer magnitude. WN weak relations stayed near prior failure levels, so low-capacity MLP is not a WN fix and should not be tested.
+```
+
+## Code Review Update: Score Magnitude Regularizer
+
+Code change:
+
+```text
+Added default-off --score_l2_weight.
+When causal training is enabled and score_l2_weight > 0, the trainer adds an L2 penalty on original/causal/shortcut positive and negative score magnitudes.
+The loss logs score_l2_loss and score_l2_reg_loss.
+Default behavior is unchanged because score_l2_weight=0.0.
+```
+
+Verification:
+
+```bash
+python -m py_compile train.py managers/trainer.py model/dgl/graph_classifier.py
+python train.py --help | rg "score_l2_weight|score_hidden_dim|score_dropout"
+```
+
+## WN18RR_v1 Score-L2 Smoke
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e smoke_v5_wn18rr_v1_mlp16_score_l2_001 \
+  --gpu 0 --use_causal_training --num_epochs 1 --batch_size 4 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --score_hidden_dim 16 --score_dropout 0.3 --score_l2_weight 0.001 \
+  --log_relation_metrics_validation --log_relation_mask_validation
+```
+
+Smoke result:
+
+```text
+Best validation original AUC/AUC-PR: 0.8872/0.9104
+No test run; no 8-epoch follow-up.
+Epoch1 score_l2_loss=282.1560, score_l2_reg_loss=0.2822.
+Epoch1 score means were lower than the unregularized 8-epoch late drift: original=13.79, causal=11.54, shortcut=8.90.
+Final raw=0.4717/0.3359, entropy=0.5740/0.5852.
+```
+
+Conclusion:
+
+```text
+Negative smoke. Score L2 with weight 0.001 controls score magnitude, but validation AUC-PR is weak and shortcut masks are pushed down. The second validation point showed _has_part causal_raw=0.8132 and overlap=0.3076. Do not run a full diagnostic at this weight. If scorer magnitude regularization is revisited, it needs a much weaker coefficient or a centered/calibrated score penalty; this direct L2 formulation is not ready for WN testing.
+```
+
 ## Files Kept After Consolidation
 
 ```text

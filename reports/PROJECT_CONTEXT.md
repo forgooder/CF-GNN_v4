@@ -4260,3 +4260,48 @@ Conclusion:
 ```text
 Negative validation result. The nonlinear scorer smoke was a false positive under standard batch_size=16. It did not beat same-env WN18RR_v1 baseline AUC-PR 0.9350, _hypernym returned to about 0.70 AUC-PR, and relation masks oscillated/saturated (_also_see causal_raw=0.9931, _has_part causal_raw=0.9316 at one validation point). Weight norm rose from 141.8 to 209.4. Do not test this configuration. Future WN scorer work should add explicit scorer regularization or reduce capacity/dropout before validation-only diagnostics; do not use test feedback.
 ```
+
+## 2026-06-05 Update: Low-Capacity Scorer and Score L2
+
+Low-capacity validation diagnostic:
+
+```text
+Experiment: diag_v5_wn18rr_v1_mlp_scorer16_drop03_original_w05_8ep
+Config: WN18RR_v1, 8 epochs, batch_size=16, causal_loss=0.5, effect_loss=0.0, score_hidden_dim=16, score_dropout=0.3, original score, selection_metric=auc_pr, all-mode/relation score/mask logging.
+Best validation original AUC/AUC-PR: 0.9136/0.9186.
+Best all-mode observed: shortcut AUC/AUC-PR 0.9137/0.9189.
+No test run.
+```
+
+Conclusion:
+
+```text
+Negative validation result. Lower capacity and stronger dropout did not beat same-env WN18RR_v1 baseline AUC-PR 0.9350 and did not fix weak relations. _hypernym remained around AUC-PR 0.70 and _has_part around 0.69-0.72. Score magnitude still drifted: original_score_mean reached 78.28 at epoch6 and weight_norm reached 208.0 at epoch8. Do not test.
+```
+
+Code change:
+
+```text
+Added default-off --score_l2_weight.
+When causal training is enabled and score_l2_weight > 0, the trainer adds L2 regularization on original/causal/shortcut positive and negative score magnitudes.
+Logs score_l2_loss and score_l2_reg_loss.
+Default behavior is unchanged.
+```
+
+Smoke:
+
+```text
+Experiment: smoke_v5_wn18rr_v1_mlp16_score_l2_001
+Config: WN18RR_v1, 1 epoch, batch_size=4, score_hidden_dim=16, score_dropout=0.3, score_l2_weight=0.001, causal_loss=0.5, effect_loss=0.0.
+Best validation AUC/AUC-PR: 0.8872/0.9104.
+No test run; no 8-epoch follow-up.
+Epoch1 score_l2_loss=282.1560, score_l2_reg_loss=0.2822.
+Epoch1 score means were controlled: original=13.79, causal=11.54, shortcut=8.90.
+Final mask raw=0.4717/0.3359, entropy=0.5740/0.5852.
+```
+
+Conclusion:
+
+```text
+Negative smoke. Direct score L2 at weight 0.001 controls score magnitude but hurts validation and pushes shortcut masks down. The second validation point had _has_part causal_raw=0.8132 and overlap=0.3076. Do not run the full diagnostic at this weight. Future score regularization, if any, should be weaker or centered/calibrated rather than direct L2.
+```

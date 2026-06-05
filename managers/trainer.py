@@ -251,6 +251,21 @@ class Trainer():
         shortcut_neg = outputs_neg['shortcut'].view(len(shortcut_pos), -1).mean(dim=1)
         return shortcut_penalty_weight * torch.abs(shortcut_pos - shortcut_neg).mean()
 
+    def score_l2_regularization(self, outputs_pos, outputs_neg):
+        score_l2_weight = getattr(self.params, 'score_l2_weight', 0.0)
+        if score_l2_weight == 0:
+            return torch.tensor(0.0, device=self.params.device), torch.tensor(0.0, device=self.params.device)
+
+        score_l2_loss = (
+            outputs_pos['original'].pow(2).mean()
+            + outputs_neg['original'].pow(2).mean()
+            + outputs_pos['causal'].pow(2).mean()
+            + outputs_neg['causal'].pow(2).mean()
+            + outputs_pos['shortcut'].pow(2).mean()
+            + outputs_neg['shortcut'].pow(2).mean()
+        ) / 6.0
+        return score_l2_weight * score_l2_loss, score_l2_loss
+
     def current_effect_loss_weight(self):
         target_weight = getattr(self.params, 'effect_loss_weight', 1.0)
         warmup_epochs = getattr(self.params, 'effect_loss_warmup_epochs', 0)
@@ -334,6 +349,7 @@ class Trainer():
         effect_loss = self.ranking_loss(effect_pos, effect_neg)
         mask_reg_loss, mask_stats = self.mask_regularization(outputs_pos, outputs_neg)
         shortcut_loss = self.shortcut_penalty(outputs_pos, outputs_neg)
+        score_l2_reg_loss, score_l2_loss = self.score_l2_regularization(outputs_pos, outputs_neg)
         causal_loss_weight, causal_loss_ramp_factor = self.current_causal_loss_weight()
         effect_loss_weight, effect_loss_ramp_factor = self.current_effect_loss_weight()
 
@@ -343,6 +359,7 @@ class Trainer():
             + effect_loss_weight * effect_loss
             + mask_reg_loss
             + shortcut_loss
+            + score_l2_reg_loss
         )
 
         score_mode = getattr(self.params, 'score_mode', 'original')
@@ -361,6 +378,8 @@ class Trainer():
             'masked_aux_gradient_mode': 0.0 if getattr(self.params, 'masked_aux_gradient_mode', 'full') == 'full' else 1.0,
             'mask_reg_loss': mask_reg_loss.item(),
             'shortcut_penalty': shortcut_loss.item(),
+            'score_l2_loss': score_l2_loss.item(),
+            'score_l2_reg_loss': score_l2_reg_loss.item(),
             'total_loss': total_loss.item(),
             'original_score_mean': outputs_pos['original'].mean().item(),
             'causal_score_mean': outputs_pos['causal'].mean().item(),
