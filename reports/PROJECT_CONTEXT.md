@@ -4429,3 +4429,32 @@ Interpretation:
 ```text
 FB237_v2 now has a same-environment validation baseline. Next run should be v5 on the already-built FB237_v2 cache, validation-only first. Do not test unless validation beats AUC-PR 0.9472 with healthy masks.
 ```
+
+## 2026-06-05 Late Update: FB237_v2 v5 Diagnostic
+
+After the cache and baseline were complete, the v5 mainline was run validation-only:
+
+```text
+Experiment: diag_v5_fb237_v2_original_score_w05_allmodes_10ep
+Config: batch_size=16, causal_loss=0.5, effect_loss=0.0, alpha-specific regularization, original score, selection_metric=auc_pr, all-mode validation logging.
+Stopped after epoch1 due weak validation and high runtime.
+Validation original AUC/AUC-PR: 0.8649/0.8651.
+Best all-mode AUC-PR: causal_plus_effect 0.8807.
+No test run.
+```
+
+Mask state:
+
+```text
+raw causal/shortcut: 0.5830/0.4228
+entropy causal/shortcut: 0.5257/0.6801
+overlap: 0.2445
+```
+
+Interpretation:
+
+```text
+FB237_v2 v5 is negative under the current mainline. This is not a mask-collapse failure; mask health is acceptable, but scorer quality is far below the same-env baseline AUC-PR 0.9472 and even below baseline epoch1 AUC-PR 0.9121.
+Do not run test for this config.
+Next work should either evaluate another untested variant sequentially or inspect why v2 variants lose scorer quality under the causal objective.
+```

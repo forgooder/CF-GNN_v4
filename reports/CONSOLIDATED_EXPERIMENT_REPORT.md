@@ -183,7 +183,7 @@ Current completed formal-positive count from the ledger:
 | Group | v1 | v2 | v3 | v4 |
 |---|---|---|---|---|
 | NELL | Positive formal test | Same-env baseline established; v5 validation negative | Not yet evaluated | Not yet evaluated |
-| FB237 | Positive formal test | Same-env baseline established; v5 not yet run | Not yet evaluated | Not yet evaluated |
+| FB237 | Positive formal test | Same-env baseline established; v5 validation negative | Not yet evaluated | Not yet evaluated |
 | WN18RR | Negative formal test / negative diagnostics | Negative validation/test diagnostics | Not yet evaluated | Negative validation diagnostics |
 
 Current score:
@@ -255,6 +255,25 @@ Conclusion:
 ```text
 FB237_v2 now has a same-environment validation baseline. It is strong but lower than NELL_v2's baseline.
 Next step is a sequential v5 validation run on the already-built FB237_v2 cache; only if validation exceeds 0.9472 AUC-PR with healthy masks should formal testing be considered.
+```
+
+v5 diagnostic:
+
+```text
+Experiment: diag_v5_fb237_v2_original_score_w05_allmodes_10ep
+Stopped after epoch1 because validation was far below baseline.
+Validation original AUC/AUC-PR: 0.8649/0.8651.
+Best all-mode AUC-PR: causal_plus_effect 0.8807.
+Mask state: raw causal/shortcut 0.5830/0.4228, entropy 0.5257/0.6801, overlap 0.2445.
+No test run.
+```
+
+Conclusion:
+
+```text
+FB237_v2 is currently negative for v5. The masks are not collapsed, but the scorer is much weaker than the same-env baseline AUC-PR 0.9472.
+Together with NELL_v2, this shows that v1 gains do not transfer automatically to v2 variants under the current causal objective.
+Do not run FB237_v2 test for this v5 config.
 ```
 
 ## Next Optimization Direction
