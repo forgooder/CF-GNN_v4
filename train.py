@@ -219,6 +219,10 @@ if __name__ == '__main__':
                         help='whether to concatenate head/tail embedding with pooled graph representation')
     parser.add_argument('--has_attn', '-attn', type=bool, default=True,
                         help='whether to have attn in model or not')
+    parser.add_argument("--score_hidden_dim", type=int, default=0,
+                        help="Optional hidden dimension for a nonlinear graph scorer; 0 keeps the original linear scorer")
+    parser.add_argument("--score_dropout", type=float, default=0.0,
+                        help="Dropout used by the optional nonlinear graph scorer")
 
     params = parser.parse_args()
     initialize_experiment(params, __file__)

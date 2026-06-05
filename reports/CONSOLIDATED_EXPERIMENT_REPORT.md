@@ -661,6 +661,104 @@ Conclusion:
 Negative validation result. The shortcut floor fixes the mask-health failure introduced by relation-overlap penalty, but it does not fix WN18RR weak-relation ranking. The best validation AUC-PR remains below same-env baseline 0.9350 and below the no-floor/no-overlap relation-metrics diagnostic. Do not test. This narrows the WN issue further: mask health can be made acceptable, but _hypernym and _has_part remain structurally hard for the current scorer/objective.
 ```
 
+## Code Review Update: Optional Nonlinear Scorer
+
+Code change:
+
+```text
+Added default-off --score_hidden_dim and --score_dropout.
+score_hidden_dim=0 preserves the original linear GraIL scorer.
+When score_hidden_dim > 0, GraphClassifier uses Linear -> ReLU -> Dropout -> Linear on the existing graph/head/tail/relation representation.
+No data, negative sampling, subgraph extraction, metric, or baseline default behavior changed.
+```
+
+Verification:
+
+```bash
+python -m py_compile train.py model/dgl/graph_classifier.py managers/trainer.py managers/evaluator.py utils/score_utils.py
+python train.py --help | rg "score_hidden_dim|score_dropout"
+```
+
+## WN18RR_v1 Nonlinear Scorer Smoke
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e smoke_v5_wn18rr_v1_mlp_scorer64 \
+  --gpu 0 --use_causal_training --num_epochs 1 --batch_size 4 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --score_hidden_dim 64 --score_dropout 0.1 \
+  --log_relation_metrics_validation --log_relation_mask_validation
+```
+
+Smoke result:
+
+```text
+Best validation original AUC/AUC-PR: 0.9270/0.9367
+No test run.
+Epoch1 final raw=0.3759/0.4362, entropy=0.5604/0.6841, overlap=0.1620
+```
+
+Relation observations:
+
+```text
+First validation point: _hypernym AUC-PR=0.8773, much higher than prior WN relation diagnostics near 0.70.
+Second validation point: _hypernym AUC-PR=0.8511, _has_part AUC-PR=0.7059.
+Masks were healthy in the smoke; shortcut entropy stayed high and no raw mask collapsed.
+```
+
+Conclusion:
+
+```text
+The smoke suggested that a nonlinear scorer can temporarily improve WN18RR_v1 relation ranking, especially _hypernym, without immediate mask collapse. This was not treated as a performance result because it used batch_size=4 and only one epoch. It justified a validation-only batch_size=16 diagnostic, not a test run.
+```
+
+## WN18RR_v1 Nonlinear Scorer Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_mlp_scorer64_original_w05_8ep \
+  --gpu 0 --use_causal_training --num_epochs 8 --batch_size 16 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --score_hidden_dim 64 --score_dropout 0.1 \
+  --log_all_score_modes_validation --log_relation_metrics_validation --log_relation_mask_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.9168/0.9207
+Best all-mode observed causal AUC/AUC-PR 0.9169/0.9211
+No test run.
+```
+
+Diagnostics:
+
+```text
+Same-env WN18RR_v1 baseline AUC-PR: 0.9350
+Epoch3 relation masks showed localized alpha saturation: _also_see causal_raw=0.9931, _has_part causal_raw=0.9316.
+Later validation fell as low as original AUC/AUC-PR 0.8419/0.8888.
+Weight norm rose from 141.8 at epoch1 to 209.4 at epoch8.
+Final global raw=0.3523/0.4381, entropy=0.4027/0.6841.
+```
+
+Conclusion:
+
+```text
+Negative validation result. The nonlinear scorer smoke was a false positive under the standard batch_size=16 diagnostic. The MLP scorer increased capacity but did not repair stable WN18RR_v1 relation ranking; _hypernym returned to about 0.70 AUC-PR and validation stayed below same-env baseline. It also introduced score/mask co-adaptation: scorer weight norm and score magnitudes rose while relation-level causal masks oscillated or saturated. Do not test this configuration. If this direction is revisited, it needs explicit scorer regularization or lower-capacity/stronger-dropout validation, not test-set feedback.
+```
+
 ## Files Kept After Consolidation
 
 ```text

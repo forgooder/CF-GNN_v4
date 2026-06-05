@@ -4222,3 +4222,41 @@ Conclusion:
 ```text
 Negative validation result. Shortcut floor fixes relation-overlap mask collapse, but WN weak-relation ranking remains weak. Do not test. Do not keep sweeping overlap/floor weights unless there is a new relation-scoring hypothesis; current evidence points to scorer/objective limits rather than mask-health-only failure.
 ```
+
+## 2026-06-05 Update: Optional Nonlinear Scorer Diagnostic
+
+Code change:
+
+```text
+Added default-off --score_hidden_dim and --score_dropout.
+score_hidden_dim=0 preserves the original linear GraIL scorer.
+When enabled, GraphClassifier uses Linear -> ReLU -> Dropout -> Linear on the existing graph/head/tail/relation representation.
+Baseline default behavior is unchanged.
+```
+
+Smoke:
+
+```text
+Experiment: smoke_v5_wn18rr_v1_mlp_scorer64
+Config: WN18RR_v1, 1 epoch, batch_size=4, causal_loss=0.5, effect_loss=0.0, score_hidden_dim=64, score_dropout=0.1, original score, selection_metric=auc_pr.
+Best validation AUC/AUC-PR: 0.9270/0.9367.
+Mask: final raw=0.3759/0.4362, entropy=0.5604/0.6841, overlap=0.1620.
+Observation: _hypernym briefly improved to AUC-PR 0.8773 then 0.8511, much higher than prior WN diagnostics near 0.70.
+No test run.
+```
+
+Validation diagnostic:
+
+```text
+Experiment: diag_v5_wn18rr_v1_mlp_scorer64_original_w05_8ep
+Config: WN18RR_v1, 8 epochs, batch_size=16, causal_loss=0.5, effect_loss=0.0, score_hidden_dim=64, score_dropout=0.1, original score, selection_metric=auc_pr, all-mode/relation score/mask logging.
+Best validation original AUC/AUC-PR: 0.9168/0.9207.
+Best all-mode observed: causal AUC/AUC-PR 0.9169/0.9211.
+No test run.
+```
+
+Conclusion:
+
+```text
+Negative validation result. The nonlinear scorer smoke was a false positive under standard batch_size=16. It did not beat same-env WN18RR_v1 baseline AUC-PR 0.9350, _hypernym returned to about 0.70 AUC-PR, and relation masks oscillated/saturated (_also_see causal_raw=0.9931, _has_part causal_raw=0.9316 at one validation point). Weight norm rose from 141.8 to 209.4. Do not test this configuration. Future WN scorer work should add explicit scorer regularization or reduce capacity/dropout before validation-only diagnostics; do not use test feedback.
+```

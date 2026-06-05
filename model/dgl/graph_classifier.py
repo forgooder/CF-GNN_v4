@@ -21,9 +21,21 @@ class GraphClassifier(nn.Module):
         self.causal_mask_generator = CausalMaskGenerator(params)
 
         if self.params.add_ht_emb:
-            self.fc_layer = nn.Linear(3 * self.params.num_gcn_layers * self.params.emb_dim + self.params.rel_emb_dim, 1)
+            scorer_input_dim = 3 * self.params.num_gcn_layers * self.params.emb_dim + self.params.rel_emb_dim
         else:
-            self.fc_layer = nn.Linear(self.params.num_gcn_layers * self.params.emb_dim + self.params.rel_emb_dim, 1)
+            scorer_input_dim = self.params.num_gcn_layers * self.params.emb_dim + self.params.rel_emb_dim
+
+        score_hidden_dim = getattr(self.params, 'score_hidden_dim', 0)
+        if score_hidden_dim and score_hidden_dim > 0:
+            score_dropout = getattr(self.params, 'score_dropout', 0.0)
+            self.fc_layer = nn.Sequential(
+                nn.Linear(scorer_input_dim, score_hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(score_dropout),
+                nn.Linear(score_hidden_dim, 1)
+            )
+        else:
+            self.fc_layer = nn.Linear(scorer_input_dim, 1)
 
     def _score(self, g, rel_labels, edge_mask=None):
         g.ndata['h'] = self.gnn(g, edge_mask=edge_mask)
