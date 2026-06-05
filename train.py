@@ -227,6 +227,8 @@ if __name__ == '__main__':
                         help='whether to concatenate head/tail embedding with pooled graph representation')
     parser.add_argument("--add_ht_interaction_features", action='store_true',
                         help="Add head-tail product and absolute-difference features to the graph scorer; default off")
+    parser.add_argument("--add_graph_maxpool_features", action='store_true',
+                        help="Add max-pooled graph features to the scorer input; default off")
     parser.add_argument('--has_attn', '-attn', type=bool, default=True,
                         help='whether to have attn in model or not')
     parser.add_argument("--score_hidden_dim", type=int, default=0,

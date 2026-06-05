@@ -1,6 +1,6 @@
 from .rgcn_model import RGCN
 from .causal_mask import CausalMaskGenerator
-from dgl import mean_nodes
+from dgl import mean_nodes, max_nodes
 import torch.nn as nn
 import torch
 """
@@ -25,8 +25,12 @@ class GraphClassifier(nn.Module):
             scorer_input_dim = 3 * node_repr_dim + self.params.rel_emb_dim
             if getattr(self.params, 'add_ht_interaction_features', False):
                 scorer_input_dim += 2 * node_repr_dim
+            if getattr(self.params, 'add_graph_maxpool_features', False):
+                scorer_input_dim += node_repr_dim
         else:
             scorer_input_dim = self.params.num_gcn_layers * self.params.emb_dim + self.params.rel_emb_dim
+            if getattr(self.params, 'add_graph_maxpool_features', False):
+                scorer_input_dim += self.params.num_gcn_layers * self.params.emb_dim
 
         score_hidden_dim = getattr(self.params, 'score_hidden_dim', 0)
         if score_hidden_dim and score_hidden_dim > 0:
@@ -44,6 +48,8 @@ class GraphClassifier(nn.Module):
         g.ndata['h'] = self.gnn(g, edge_mask=edge_mask)
 
         g_out = mean_nodes(g, 'repr')
+        if getattr(self.params, 'add_graph_maxpool_features', False):
+            g_out_max = max_nodes(g, 'repr')
 
         head_ids = (g.ndata['id'] == 1).nonzero().squeeze(1)
         head_embs = g.ndata['repr'][head_ids]
@@ -61,6 +67,8 @@ class GraphClassifier(nn.Module):
                 head_flat,
                 tail_flat
             ]
+            if getattr(self.params, 'add_graph_maxpool_features', False):
+                g_rep_parts.append(g_out_max.view(-1, node_repr_dim))
             if getattr(self.params, 'add_ht_interaction_features', False):
                 g_rep_parts.extend([
                     head_flat * tail_flat,
@@ -69,7 +77,11 @@ class GraphClassifier(nn.Module):
             g_rep_parts.append(self.rel_emb(rel_labels))
             g_rep = torch.cat(g_rep_parts, dim=1)
         else:
-            g_rep = torch.cat([g_out.view(-1, self.params.num_gcn_layers * self.params.emb_dim), self.rel_emb(rel_labels)], dim=1)
+            graph_parts = [g_out.view(-1, self.params.num_gcn_layers * self.params.emb_dim)]
+            if getattr(self.params, 'add_graph_maxpool_features', False):
+                graph_parts.append(g_out_max.view(-1, self.params.num_gcn_layers * self.params.emb_dim))
+            graph_parts.append(self.rel_emb(rel_labels))
+            g_rep = torch.cat(graph_parts, dim=1)
 
         output = self.fc_layer(g_rep)
         return output

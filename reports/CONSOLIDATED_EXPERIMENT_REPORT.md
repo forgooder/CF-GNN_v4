@@ -1,6 +1,6 @@
 # Causal-GraIL v5 Consolidated Experiment Report
 
-Updated: 2026-06-04 22:18 CST
+Updated: 2026-06-05 11:00 CST
 
 ## Scope
 
@@ -255,6 +255,49 @@ Conclusion:
 
 ```text
 This relation-aware budget is negative. It does not improve aggregate WN18RR_v1 validation and does not reliably repair _hypernym or _has_part. The next relation-aware attempt should not simply force weak relations to larger causal masks; it needs either per-relation diagnostics of mask means or a different relation-specific objective.
+```
+
+## Graph Summary Addendum
+
+Added a default-off graph maxpool feature to the scorer:
+
+```text
+--add_graph_maxpool_features
+```
+
+WN18RR_v1 results:
+
+```text
+smoke_v5_graph_maxpool_validation:
+  best validation AUC/AUC-PR = 0.8987/0.9117
+  final raw = 0.3789/0.4352
+  _hypernym margin_tie_rate = 0.5059523809523809
+
+diag_v5_wn18rr_v1_graph_maxpool_original_w05_8ep:
+  best validation AUC/AUC-PR = 0.9161/0.9191
+  final raw = 0.7694/0.7131
+  _hypernym AUC-PR = 0.7023
+```
+
+Interpretation:
+
+```text
+Graph maxpool is a healthy code path and slightly changes relation-wise score dynamics, but it does not close the WN18RR_v1 gap to same-env baseline AUC-PR 0.9350. The same-size _hypernym tie pattern remains visible.
+```
+
+Failed graph-stat branch:
+
+```text
+smoke_v5_graph_stat_validation_v1-v4:
+  attempted max/min/std graph summary features
+  failed first on DGL compatibility (min_nodes unavailable)
+  then on validation-time NaN/inf scores even after compatibility fixes
+```
+
+Interpretation:
+
+```text
+The richer graph-stat path is not a useful next step in this environment as implemented. It is lower priority than relation-specific discrimination on the existing healthy graph-maxpool path.
 ```
 
 ## Code Review Update: Causal Loss Warmup/Ramp
