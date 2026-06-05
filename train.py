@@ -175,6 +175,8 @@ if __name__ == '__main__':
                         help="Log validation AUC/AUC-PR grouped by target relation for the selected score mode; default off")
     parser.add_argument("--log_relation_score_stats_validation", action='store_true',
                         help="Log validation positive/negative score distribution stats grouped by target relation; default off")
+    parser.add_argument("--log_relation_pair_stats_validation", action='store_true',
+                        help="Log validation paired positive/negative score and graph-size stats grouped by target relation; default off")
     parser.add_argument("--log_relation_mask_validation", action='store_true',
                         help="Log validation mask diagnostics grouped by target relation; default off")
 

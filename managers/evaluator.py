@@ -216,6 +216,109 @@ class Evaluator():
             key=lambda item: (float('inf') if item['score_gap'] is None else item['score_gap'], item['rel_id'])
         )
 
+    def _batch_counts(self, graph, attr_name):
+        batch_counts = getattr(graph, attr_name, None)
+        if batch_counts is None:
+            return None
+        batch_counts = batch_counts() if callable(batch_counts) else batch_counts
+        return torch.as_tensor(batch_counts, dtype=torch.long).view(-1).detach().cpu()
+
+    def eval_pair_stats_by_relation(self, score_mode=None, tie_eps=1e-6):
+        score_mode = score_mode or getattr(self.params, 'score_mode', 'original')
+        relation_pairs = {}
+        dataloader = DataLoader(self.data, batch_size=self.params.batch_size, shuffle=False, num_workers=self.params.num_workers, collate_fn=self.params.collate_fn)
+
+        self.graph_classifier.eval()
+        with torch.no_grad():
+            for b_idx, batch in enumerate(dataloader):
+                data_pos, targets_pos, data_neg, targets_neg = self.params.move_batch_to_device(batch, self.params.device)
+                graph_pos = data_pos[0]
+                graph_neg = data_neg[0]
+                score_pos = forward_for_score(self.graph_classifier, data_pos, score_mode).view(-1).detach().cpu()
+                score_neg = forward_for_score(self.graph_classifier, data_neg, score_mode).view(-1).detach().cpu()
+                rel_pos = data_pos[1].view(-1).detach().cpu()
+                rel_neg = data_neg[1].view(-1).detach().cpu()
+                pos_nodes = self._batch_counts(graph_pos, 'batch_num_nodes')
+                neg_nodes = self._batch_counts(graph_neg, 'batch_num_nodes')
+                pos_edges = self._batch_counts(graph_pos, 'batch_num_edges')
+                neg_edges = self._batch_counts(graph_neg, 'batch_num_edges')
+
+                if len(score_pos) != len(score_neg) or len(rel_pos) != len(score_pos) or len(rel_neg) != len(score_neg):
+                    continue
+                if pos_nodes is None or neg_nodes is None or pos_edges is None or neg_edges is None:
+                    continue
+                if len(pos_nodes) != len(score_pos) or len(neg_nodes) != len(score_neg):
+                    continue
+                if len(pos_edges) != len(score_pos) or len(neg_edges) != len(score_neg):
+                    continue
+
+                margins = score_pos - score_neg
+                same_rel = rel_pos == rel_neg
+                same_nodes = pos_nodes == neg_nodes
+                same_edges = pos_edges == neg_edges
+                same_size = same_nodes & same_edges
+                ties = torch.abs(margins) <= float(tie_eps)
+                nonpositive = margins <= 0
+
+                for rel_id, margin, rel_match, node_match, edge_match, size_match, is_tie, is_nonpositive in zip(
+                    rel_pos.tolist(),
+                    margins.tolist(),
+                    same_rel.tolist(),
+                    same_nodes.tolist(),
+                    same_edges.tolist(),
+                    same_size.tolist(),
+                    ties.tolist(),
+                    nonpositive.tolist()
+                ):
+                    bucket = relation_pairs.setdefault(int(rel_id), {
+                        'count': 0,
+                        'same_rel': 0,
+                        'same_node_count': 0,
+                        'same_edge_count': 0,
+                        'same_size': 0,
+                        'ties': 0,
+                        'nonpositive': 0,
+                        'tie_same_node_count': 0,
+                        'tie_same_edge_count': 0,
+                        'tie_same_size': 0,
+                        'margins': []
+                    })
+                    bucket['count'] += 1
+                    bucket['same_rel'] += int(rel_match)
+                    bucket['same_node_count'] += int(node_match)
+                    bucket['same_edge_count'] += int(edge_match)
+                    bucket['same_size'] += int(size_match)
+                    bucket['ties'] += int(is_tie)
+                    bucket['nonpositive'] += int(is_nonpositive)
+                    bucket['tie_same_node_count'] += int(is_tie and node_match)
+                    bucket['tie_same_edge_count'] += int(is_tie and edge_match)
+                    bucket['tie_same_size'] += int(is_tie and size_match)
+                    bucket['margins'].append(float(margin))
+
+        id2relation = getattr(self.data, 'id2relation', {})
+        results = []
+        for rel_id, bucket in relation_pairs.items():
+            count = max(1, bucket['count'])
+            tie_count = max(1, bucket['ties'])
+            margins = np.asarray(bucket['margins'], dtype=np.float64)
+            results.append({
+                'rel_id': int(rel_id),
+                'relation': id2relation.get(int(rel_id), str(rel_id)),
+                'pairs': int(bucket['count']),
+                'same_rel_rate': bucket['same_rel'] / count,
+                'same_node_count_rate': bucket['same_node_count'] / count,
+                'same_edge_count_rate': bucket['same_edge_count'] / count,
+                'same_size_rate': bucket['same_size'] / count,
+                'margin_le0_rate': bucket['nonpositive'] / count,
+                'margin_tie_rate': bucket['ties'] / count,
+                'tie_same_node_count_rate': bucket['tie_same_node_count'] / tie_count if bucket['ties'] else None,
+                'tie_same_edge_count_rate': bucket['tie_same_edge_count'] / tie_count if bucket['ties'] else None,
+                'tie_same_size_rate': bucket['tie_same_size'] / tie_count if bucket['ties'] else None,
+                'margin_p50': float(np.percentile(margins, 50)) if len(margins) else None
+            })
+
+        return sorted(results, key=lambda item: (-item['margin_tie_rate'], item['rel_id']))
+
     def _add_relation_mask_stats(self, relation_masks, outputs):
         rel_labels = outputs.get('target_rel_labels')
         if rel_labels is None:

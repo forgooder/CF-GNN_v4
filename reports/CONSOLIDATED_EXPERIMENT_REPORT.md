@@ -1113,6 +1113,61 @@ Conclusion:
 Negative smoke but useful diagnostic. The repeated _hypernym tie_rate around 50% confirms that the WN18RR_v1 dominant weak relation has a paired-score degeneracy under the current graph/scorer representation. This makes further mask-budget/overlap tuning unlikely to solve WN18RR_v1 by itself. The next defensible experiment should target relation-specific margin separation or inspect whether tied _hypernym pairs are structurally indistinguishable in extracted subgraphs, without changing extraction or sampling.
 ```
 
+## Relation Pair Structure Diagnostic
+
+Code change:
+
+```text
+Added default-off --log_relation_pair_stats_validation.
+When enabled, validation logs paired positive/negative margin stats plus same-relation, same-node-count, same-edge-count, same-size, and tie-subset same-size rates by relation.
+Default behavior is unchanged; training, checkpoint selection, data, negative sampling, subgraph extraction, and metric formulas are unchanged.
+```
+
+Verification:
+
+```bash
+conda run -n cignn_dgl python -m py_compile managers/evaluator.py managers/trainer.py train.py
+conda run -n cignn_dgl python train.py --help | rg "log_relation_pair_stats_validation|log_relation_score_stats_validation"
+```
+
+Smoke:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 conda run -n cignn_dgl python -u train.py -d WN18RR_v1 -e smoke_v5_relation_pair_stats_validation \
+  --gpu 0 --use_causal_training --num_epochs 1 --batch_size 4 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --score_mode original --selection_metric auc_pr \
+  --log_relation_metrics_validation --log_relation_score_stats_validation \
+  --log_relation_pair_stats_validation --log_relation_mask_validation
+```
+
+Smoke result:
+
+```text
+Best validation original AUC/AUC-PR: 0.8498/0.8974
+No test run; no 8-epoch follow-up.
+Epoch1 final raw=0.4230/0.4332, entropy=0.5140/0.6829, overlap=0.1819.
+```
+
+Pair-structure observations:
+
+```text
+At the first validation point, _hypernym pair stats showed same_size_rate=0.5060, margin_tie_rate=0.5060, tie_same_size_rate=1.0, margin_p50=0.0.
+At the second validation point, _hypernym repeated same_size_rate=0.5060, margin_tie_rate=0.5060, tie_same_size_rate=1.0, margin_p50=0.0.
+The relation-level AUC-PR stayed weak for _hypernym: 0.7050 then 0.6997.
+_derivationally_related_form had much lower same_size_rate/tie_rate at the best point, both 0.0792, while retaining AUC-PR=0.9760.
+```
+
+Conclusion:
+
+```text
+Negative smoke but important structural diagnosis. _hypernym paired score ties align exactly with positive/negative pairs that have identical node and edge counts in the extracted subgraphs. This does not prove full graph isomorphism, but it shows the dominant WN18RR_v1 weakness is strongly associated with same-size paired subgraphs under the existing extraction, not global mask collapse. Because data, negative sampling, and extraction are fixed by constraint, the next code-side experiment should add default-off diagnostics or model capacity that can distinguish same-size _hypernym pairs using existing node/edge features, and should qualify on validation before any test.
+```
+
 ## Files Kept After Consolidation
 
 ```text
