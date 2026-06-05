@@ -1,6 +1,6 @@
 # Causal-GraIL v5 Consolidated Experiment Report
 
-Updated: 2026-06-05 11:10 CST
+Updated: 2026-06-05 12:00 CST
 
 ## Scope
 
@@ -166,6 +166,35 @@ It is negative on WN18RR_v1/v2/v4, despite much healthier masks.
 The project has credible evidence that v5 mitigates mask collapse, but gains are dataset-dependent.
 ```
 
+## 12-Task Target Clarification
+
+The intended target set is now:
+
+```text
+NELL_v1-v4
+FB237_v1-v4
+WN18RR_v1-v4
+```
+
+To exceed 80% over baseline, at least 10 of these 12 tasks need credible AUC-PR/Hits@10 gains in the same environment.
+
+Current completed formal-positive count from the ledger:
+
+| Group | v1 | v2 | v3 | v4 |
+|---|---|---|---|---|
+| NELL | Positive formal test | Not yet evaluated | Not yet evaluated | Not yet evaluated |
+| FB237 | Positive formal test | Not yet evaluated | Not yet evaluated | Not yet evaluated |
+| WN18RR | Negative formal test / negative diagnostics | Negative validation/test diagnostics | Not yet evaluated | Negative validation diagnostics |
+
+Current score:
+
+```text
+2 / 12 formal-positive tasks.
+Need at least 10 / 12.
+```
+
+This means the immediate project state is substantially short of the expanded target. The next scheduling priority should shift from only repairing WN18RR_v1 to broad validation coverage of the untested NELL/FB237 variants, while continuing WN-specific work without test-set tuning.
+
 ## Next Optimization Direction
 
 The next useful optimization should focus on WN18RR without using test feedback:
@@ -298,6 +327,37 @@ Interpretation:
 
 ```text
 The richer graph-stat path is not a useful next step in this environment as implemented. It is lower priority than relation-specific discrimination on the existing healthy graph-maxpool path.
+```
+
+## WN18RR_v1 MLP Aggregator Diagnostic
+
+Existing built-in option tested:
+
+```text
+--gnn_agg_type mlp
+```
+
+Smoke:
+
+```text
+Experiment: smoke_v5_wn18rr_v1_mlp_agg_original_w05
+Best validation AUC/AUC-PR: 0.9143/0.9309
+No test run.
+Signal: first validation reduced _hypernym margin_tie_rate from about 0.506 to 0.095 and raised _hypernym AUC-PR to 0.8785.
+```
+
+Standard validation-only follow-up:
+
+```text
+Experiment: diag_v5_wn18rr_v1_mlp_agg_original_w05_8ep
+Best validation AUC/AUC-PR: 0.9051/0.9124
+No test run.
+```
+
+Conclusion:
+
+```text
+MLP aggregation does not replicate the smoke signal under standard batch_size=16 validation. _hypernym returns to the same paired tie pattern and aggregate AUC-PR remains below same-env WN18RR_v1 baseline 0.9350. Do not test this configuration.
 ```
 
 ## Code Review Update: Causal Loss Warmup/Ramp
