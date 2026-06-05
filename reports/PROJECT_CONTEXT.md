@@ -4343,3 +4343,29 @@ Conclusion:
 ```text
 Negative validation result. The weak-relation improvement from smoke did not reproduce at standard batch_size=16. Best-point _hypernym AUC-PR was only 0.7048 and _has_part AUC-PR 0.6700; later validation dropped to AUC/AUC-PR 0.8345/0.8861. Relation masks were unstable: early _hypernym causal_raw=0.8571 with overlap=0.3406; later _has_part causal_raw=0.0467 with entropy=0.1401. Do not test. Simple weak-relation upweighting is not a WN fix.
 ```
+
+## 2026-06-05 Update: Head/Tail Interaction Features
+
+Code change:
+
+```text
+Added default-off --add_ht_interaction_features.
+When enabled with add_ht_emb=True, GraphClassifier appends head * tail and abs(head - tail) to the existing graph/head/tail/relation scorer input.
+Default behavior is unchanged.
+```
+
+Smoke:
+
+```text
+Experiment: smoke_v5_wn18rr_v1_ht_interactions
+Config: WN18RR_v1, 1 epoch, batch_size=4, causal_loss=0.5, effect_loss=0.0, original score, selection_metric=auc_pr, add_ht_interaction_features.
+Best validation AUC/AUC-PR: 0.8301/0.8842.
+No test run; no 8-epoch follow-up.
+Epoch1 final raw=0.4950/0.4275, entropy=0.5815/0.6815.
+```
+
+Conclusion:
+
+```text
+Negative smoke. Head/tail interaction features keep masks globally healthy but substantially hurt aggregate WN18RR_v1 validation. _has_part improved to AUC-PR=0.9158 and _also_see to 0.9692 at the second validation point, but _hypernym stayed weak around 0.6909 and aggregate stayed far below same-env AUC-PR 0.9350. Do not run a full diagnostic or test.
+```

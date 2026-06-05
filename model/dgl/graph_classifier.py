@@ -21,7 +21,10 @@ class GraphClassifier(nn.Module):
         self.causal_mask_generator = CausalMaskGenerator(params)
 
         if self.params.add_ht_emb:
-            scorer_input_dim = 3 * self.params.num_gcn_layers * self.params.emb_dim + self.params.rel_emb_dim
+            node_repr_dim = self.params.num_gcn_layers * self.params.emb_dim
+            scorer_input_dim = 3 * node_repr_dim + self.params.rel_emb_dim
+            if getattr(self.params, 'add_ht_interaction_features', False):
+                scorer_input_dim += 2 * node_repr_dim
         else:
             scorer_input_dim = self.params.num_gcn_layers * self.params.emb_dim + self.params.rel_emb_dim
 
@@ -49,10 +52,22 @@ class GraphClassifier(nn.Module):
         tail_embs = g.ndata['repr'][tail_ids]
 
         if self.params.add_ht_emb:
-            g_rep = torch.cat([g_out.view(-1, self.params.num_gcn_layers * self.params.emb_dim),
-                               head_embs.view(-1, self.params.num_gcn_layers * self.params.emb_dim),
-                               tail_embs.view(-1, self.params.num_gcn_layers * self.params.emb_dim),
-                               self.rel_emb(rel_labels)], dim=1)
+            node_repr_dim = self.params.num_gcn_layers * self.params.emb_dim
+            g_out_flat = g_out.view(-1, node_repr_dim)
+            head_flat = head_embs.view(-1, node_repr_dim)
+            tail_flat = tail_embs.view(-1, node_repr_dim)
+            g_rep_parts = [
+                g_out_flat,
+                head_flat,
+                tail_flat
+            ]
+            if getattr(self.params, 'add_ht_interaction_features', False):
+                g_rep_parts.extend([
+                    head_flat * tail_flat,
+                    torch.abs(head_flat - tail_flat)
+                ])
+            g_rep_parts.append(self.rel_emb(rel_labels))
+            g_rep = torch.cat(g_rep_parts, dim=1)
         else:
             g_rep = torch.cat([g_out.view(-1, self.params.num_gcn_layers * self.params.emb_dim), self.rel_emb(rel_labels)], dim=1)
 

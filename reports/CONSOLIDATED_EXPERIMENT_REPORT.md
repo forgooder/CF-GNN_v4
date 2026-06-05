@@ -951,6 +951,64 @@ Conclusion:
 Negative validation result. Relation-weighted ranking loss produced a short smoke improvement but did not reproduce under the standard batch_size=16 diagnostic. It increases pressure on weak relations but does not fix their ranking and can destabilize relation-level masks in both directions. Do not test this configuration. Further WN work should avoid simply upweighting weak relations and should instead inspect whether _hypernym/_has_part require relation-specific features or a different subgraph scorer, while preserving the unchanged data/evaluation path.
 ```
 
+## Code Review Update: Head/Tail Interaction Scorer Features
+
+Code change:
+
+```text
+Added default-off --add_ht_interaction_features.
+When enabled with add_ht_emb=True, GraphClassifier appends head * tail and abs(head - tail) features to the existing graph/head/tail/relation scorer input.
+Default behavior is unchanged because the flag is off by default.
+No data, negative sampling, subgraph extraction, metric, or baseline path changed.
+```
+
+Verification:
+
+```bash
+python -m py_compile train.py model/dgl/graph_classifier.py managers/trainer.py
+python train.py --help | rg "add_ht_interaction|score_hidden_dim"
+```
+
+## WN18RR_v1 Head/Tail Interaction Smoke
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e smoke_v5_wn18rr_v1_ht_interactions \
+  --gpu 0 --use_causal_training --num_epochs 1 --batch_size 4 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --add_ht_interaction_features \
+  --score_mode original --selection_metric auc_pr \
+  --log_relation_metrics_validation --log_relation_mask_validation
+```
+
+Smoke result:
+
+```text
+Best validation original AUC/AUC-PR: 0.8301/0.8842
+No test run; no 8-epoch follow-up.
+Epoch1 final raw=0.4950/0.4275, entropy=0.5815/0.6815.
+```
+
+Relation observations:
+
+```text
+_has_part improved at the second validation point to AUC-PR=0.9158 and _also_see to 0.9692.
+_hypernym stayed weak around AUC-PR=0.6909.
+Aggregate validation remained far below same-env WN18RR_v1 baseline AUC-PR 0.9350.
+Masks were globally healthy, so the failure is score quality rather than collapse.
+```
+
+Conclusion:
+
+```text
+Negative smoke. Simple head/tail product and distance features do not fix WN18RR_v1 and substantially hurt aggregate validation. Do not run a full diagnostic or test this configuration. The result further narrows WN failure: local pairwise scorer features can help some relation families but do not repair _hypernym, the dominant weak relation.
+```
+
 ## Files Kept After Consolidation
 
 ```text
