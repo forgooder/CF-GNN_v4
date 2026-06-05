@@ -183,7 +183,7 @@ Current completed formal-positive count from the ledger:
 | Group | v1 | v2 | v3 | v4 |
 |---|---|---|---|---|
 | NELL | Positive formal test | Same-env baseline established; v5 validation negative | Not yet evaluated | Not yet evaluated |
-| FB237 | Positive formal test | Not yet evaluated | Not yet evaluated | Not yet evaluated |
+| FB237 | Positive formal test | Same-env baseline established; v5 not yet run | Not yet evaluated | Not yet evaluated |
 | WN18RR | Negative formal test / negative diagnostics | Negative validation/test diagnostics | Not yet evaluated | Negative validation diagnostics |
 
 Current score:
@@ -237,6 +237,24 @@ NELL_v2 is currently negative for v5. The same-env baseline is very strong at va
 Mask collapse is not the immediate problem on NELL_v2; the current causal-training path weakens the scorer.
 Do not run NELL_v2 test for these v5 configs.
 Next broad-coverage work should establish FB237_v2 and NELL_v3/FB237_v3 baselines sequentially, then run v5 validation only after each cache is built.
+```
+
+## FB237_v2 Baseline
+
+Same-environment baseline:
+
+```text
+Experiment: baseline_fb237_v2_sameenv_10ep
+Validation-only, 10 epochs, batch_size=16, original score, selection_metric=auc_pr.
+Best validation AUC/AUC-PR: 0.9478/0.9472 at epoch10.
+No test run yet.
+```
+
+Conclusion:
+
+```text
+FB237_v2 now has a same-environment validation baseline. It is strong but lower than NELL_v2's baseline.
+Next step is a sequential v5 validation run on the already-built FB237_v2 cache; only if validation exceeds 0.9472 AUC-PR with healthy masks should formal testing be considered.
 ```
 
 ## Next Optimization Direction

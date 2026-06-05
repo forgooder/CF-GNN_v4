@@ -4412,3 +4412,20 @@ NELL_v2 is currently negative for v5. This is not a mask-collapse failure: masks
 Do not run test for these NELL_v2 configs.
 Next step: continue broad coverage sequentially, preferably `fb237_v2` baseline then v5 validation, because NELL_v2 shows that v1 success does not automatically transfer.
 ```
+
+## 2026-06-05 Late Update: FB237_v2 Baseline
+
+`FB237_v2` baseline was run sequentially after `NELL_v2`, avoiding the LMDB concurrent-cache failure mode:
+
+```text
+Experiment: baseline_fb237_v2_sameenv_10ep
+Validation-only, 10 epochs, batch_size=16, original score, selection_metric=auc_pr.
+Best validation AUC/AUC-PR: 0.9478/0.9472 at epoch10.
+No test run.
+```
+
+Interpretation:
+
+```text
+FB237_v2 now has a same-environment validation baseline. Next run should be v5 on the already-built FB237_v2 cache, validation-only first. Do not test unless validation beats AUC-PR 0.9472 with healthy masks.
+```
