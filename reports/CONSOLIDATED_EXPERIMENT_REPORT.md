@@ -1,6 +1,6 @@
 # Causal-GraIL v5 Consolidated Experiment Report
 
-Updated: 2026-06-05 11:00 CST
+Updated: 2026-06-05 11:10 CST
 
 ## Scope
 
@@ -17,7 +17,7 @@ v5-alpha-beta-mask
 Latest relevant commit:
 
 ```text
-daac33a Add causal loss warmup ramp
+ec14f4e Add graph maxpool diagnostics
 ```
 
 Important default-off additions now available:
