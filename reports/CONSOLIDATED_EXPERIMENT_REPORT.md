@@ -851,6 +851,106 @@ Conclusion:
 Negative smoke. Score L2 with weight 0.001 controls score magnitude, but validation AUC-PR is weak and shortcut masks are pushed down. The second validation point showed _has_part causal_raw=0.8132 and overlap=0.3076. Do not run a full diagnostic at this weight. If scorer magnitude regularization is revisited, it needs a much weaker coefficient or a centered/calibrated score penalty; this direct L2 formulation is not ready for WN testing.
 ```
 
+## Code Review Update: Relation-Weighted Ranking Loss
+
+Code change:
+
+```text
+Added default-off --relation_loss_weight_path.
+The JSON maps relation ids or names to ranking-loss weights used only during causal training.
+When no path is provided, ranking loss uses the original MarginRankingLoss reduction and baseline behavior is unchanged.
+Added configs/wn18rr_v1_weak_relation_loss_weight2.json with 2x loss weights for _hypernym and _has_part.
+The trainer logs relation_loss_weight_mean for causal-training batches.
+```
+
+Verification:
+
+```bash
+python -m py_compile train.py managers/trainer.py model/dgl/graph_classifier.py
+python train.py --help | rg "relation_loss_weight|score_l2_weight"
+```
+
+## WN18RR_v1 Relation-Loss Weight Smoke
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e smoke_v5_wn18rr_v1_relation_loss_w2 \
+  --gpu 0 --use_causal_training --num_epochs 1 --batch_size 4 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --relation_loss_weight_path configs/wn18rr_v1_weak_relation_loss_weight2.json \
+  --score_mode original --selection_metric auc_pr \
+  --log_relation_metrics_validation --log_relation_mask_validation
+```
+
+Smoke result:
+
+```text
+Best validation original AUC/AUC-PR: 0.9155/0.9327
+No test run.
+Epoch1 relation_loss_weight_mean=1.3398.
+Final raw=0.4358/0.4325, entropy=0.5986/0.6831.
+```
+
+Relation observations:
+
+```text
+First validation point was weak: AUC/AUC-PR 0.8757/0.8951.
+Second validation point improved weak relations: _hypernym AUC-PR=0.8633 and _has_part AUC-PR=0.9218.
+The second validation point still remained below same-env WN18RR_v1 baseline AUC-PR 0.9350.
+```
+
+Conclusion:
+
+```text
+Smoke showed a plausible but narrow weak-relation signal, so it justified a validation-only batch_size=16 diagnostic. It was not eligible for test evaluation.
+```
+
+## WN18RR_v1 Relation-Loss Weight Diagnostic
+
+Run:
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python -u train.py -d WN18RR_v1 -e diag_v5_wn18rr_v1_relation_loss_w2_original_w05_8ep \
+  --gpu 0 --use_causal_training --num_epochs 8 --batch_size 16 \
+  --causal_loss_weight 0.5 --effect_loss_weight 0.0 \
+  --mask_gamma 0.5 --mask_budget_weight 0.05 --mask_overlap_weight 0.01 \
+  --mask_logit_l2_weight 0.001 \
+  --causal_mask_entropy_floor_weight 0.1 --causal_mask_logit_l2_weight 0.002 \
+  --mask_entropy_floor 0.2 --causal_mask_target 0.45 --shortcut_mask_target 0.45 \
+  --relation_loss_weight_path configs/wn18rr_v1_weak_relation_loss_weight2.json \
+  --score_mode original --selection_metric auc_pr \
+  --log_all_score_modes_validation --log_relation_metrics_validation --log_relation_mask_validation
+```
+
+Best validation:
+
+```text
+original AUC/AUC-PR 0.9153/0.9194
+Best all-mode observed original AUC/AUC-PR 0.9153/0.9194
+No test run.
+```
+
+Diagnostics:
+
+```text
+Same-env WN18RR_v1 baseline AUC-PR: 0.9350
+relation_loss_weight_mean stayed about 1.34, confirming the weak-relation weights were active.
+Best-point weak relation metrics stayed poor: _hypernym AUC-PR=0.7048, _has_part AUC-PR=0.6700.
+Later validation dropped to original AUC/AUC-PR 0.8345/0.8861.
+Relation masks were unstable: early _hypernym causal_raw=0.8571 with overlap=0.3406; later _has_part causal_raw=0.0467 with entropy=0.1401.
+```
+
+Conclusion:
+
+```text
+Negative validation result. Relation-weighted ranking loss produced a short smoke improvement but did not reproduce under the standard batch_size=16 diagnostic. It increases pressure on weak relations but does not fix their ranking and can destabilize relation-level masks in both directions. Do not test this configuration. Further WN work should avoid simply upweighting weak relations and should instead inspect whether _hypernym/_has_part require relation-specific features or a different subgraph scorer, while preserving the unchanged data/evaluation path.
+```
+
 ## Files Kept After Consolidation
 
 ```text

@@ -129,6 +129,8 @@ if __name__ == '__main__':
                         help="Optional penalty that discourages shortcut scores from separating positive and negative samples")
     parser.add_argument("--score_l2_weight", type=float, default=0.0,
                         help="Optional training-time L2 penalty on causal-training scorer magnitudes; default off")
+    parser.add_argument("--relation_loss_weight_path", type=str, default='',
+                        help="Optional JSON file with relation-specific ranking-loss weights for causal training")
     parser.add_argument("--mask_sparsity_weight", type=float, default=0.0,
                         help="Backward-compatible optional sparsity penalty on raw causal edge masks")
     parser.add_argument("--mask_entropy_weight", type=float, default=0.0,

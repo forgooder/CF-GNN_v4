@@ -33,6 +33,7 @@ class Trainer():
         self.relation_budget = self.load_relation_budget()
         self.relation_overlap_penalty = self.load_relation_overlap_penalty()
         self.relation_shortcut_floor = self.load_relation_shortcut_floor()
+        self.relation_loss_weight = self.load_relation_loss_weight()
 
         model_params = list(self.graph_classifier.parameters())
         logging.info('Total number of parameters: %d' % sum(map(lambda x: x.numel(), model_params)))
@@ -114,11 +115,45 @@ class Trainer():
             floor[int(rel_id)] = float(value)
         return floor
 
-    def ranking_loss(self, score_pos, score_neg):
+    def load_relation_loss_weight(self):
+        relation_loss_weight_path = getattr(self.params, 'relation_loss_weight_path', '')
+        if not relation_loss_weight_path:
+            return {}
+
+        with open(relation_loss_weight_path) as f:
+            raw_weight = json.load(f)
+
+        relation2id = getattr(self.graph_classifier, 'relation2id', {})
+        raw_relation_weight = raw_weight.get('loss_weight', raw_weight)
+        weight = {}
+        for key, value in raw_relation_weight.items():
+            if key in relation2id:
+                rel_id = relation2id[key]
+            else:
+                rel_id = int(key)
+            weight[int(rel_id)] = float(value)
+        return weight
+
+    def relation_loss_weights(self, rel_labels):
+        weights = torch.ones_like(rel_labels.float(), device=self.params.device)
+        for rel_id, weight in self.relation_loss_weight.items():
+            weights = torch.where(
+                rel_labels == int(rel_id),
+                torch.full_like(weights, float(weight)),
+                weights
+            )
+        return weights
+
+    def ranking_loss(self, score_pos, score_neg, rel_labels=None):
         score_pos = score_pos.view(-1)
         score_neg = score_neg.view(len(score_pos), -1).mean(dim=1)
         target = torch.ones_like(score_pos, device=self.params.device)
-        return self.criterion(score_pos, score_neg, target)
+        if rel_labels is None or not self.relation_loss_weight:
+            return self.criterion(score_pos, score_neg, target)
+
+        losses = F.margin_ranking_loss(score_pos, score_neg, target, margin=self.params.margin, reduction='none')
+        weights = self.relation_loss_weights(rel_labels.view(-1).to(device=self.params.device))
+        return (losses * weights).sum()
 
     def mask_targets(self, target_rel_labels, default_target, budget_map):
         targets = torch.full_like(target_rel_labels.float(), float(default_target), device=self.params.device)
@@ -343,10 +378,11 @@ class Trainer():
         outputs_pos = self.causal_training_outputs(data_pos)
         outputs_neg = self.causal_training_outputs(data_neg)
 
-        original_loss = self.ranking_loss(outputs_pos['original'], outputs_neg['original'])
-        causal_loss = self.ranking_loss(outputs_pos['causal'], outputs_neg['causal'])
+        rel_labels = data_pos[1]
+        original_loss = self.ranking_loss(outputs_pos['original'], outputs_neg['original'], rel_labels)
+        causal_loss = self.ranking_loss(outputs_pos['causal'], outputs_neg['causal'], rel_labels)
         effect_pos, effect_neg = self.effect_scores_for_loss(outputs_pos, outputs_neg)
-        effect_loss = self.ranking_loss(effect_pos, effect_neg)
+        effect_loss = self.ranking_loss(effect_pos, effect_neg, rel_labels)
         mask_reg_loss, mask_stats = self.mask_regularization(outputs_pos, outputs_neg)
         shortcut_loss = self.shortcut_penalty(outputs_pos, outputs_neg)
         score_l2_reg_loss, score_l2_loss = self.score_l2_regularization(outputs_pos, outputs_neg)
@@ -380,6 +416,7 @@ class Trainer():
             'shortcut_penalty': shortcut_loss.item(),
             'score_l2_loss': score_l2_loss.item(),
             'score_l2_reg_loss': score_l2_reg_loss.item(),
+            'relation_loss_weight_mean': self.relation_loss_weights(rel_labels.view(-1).to(device=self.params.device)).mean().item(),
             'total_loss': total_loss.item(),
             'original_score_mean': outputs_pos['original'].mean().item(),
             'causal_score_mean': outputs_pos['causal'].mean().item(),

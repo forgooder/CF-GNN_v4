@@ -4305,3 +4305,41 @@ Conclusion:
 ```text
 Negative smoke. Direct score L2 at weight 0.001 controls score magnitude but hurts validation and pushes shortcut masks down. The second validation point had _has_part causal_raw=0.8132 and overlap=0.3076. Do not run the full diagnostic at this weight. Future score regularization, if any, should be weaker or centered/calibrated rather than direct L2.
 ```
+
+## 2026-06-05 Update: Relation-Weighted Ranking Loss
+
+Code change:
+
+```text
+Added default-off --relation_loss_weight_path.
+The JSON maps relation ids or names to ranking-loss weights used only during causal training.
+Default behavior is unchanged when the path is empty.
+Added configs/wn18rr_v1_weak_relation_loss_weight2.json with 2x weights for _hypernym and _has_part.
+Trainer logs relation_loss_weight_mean.
+```
+
+Smoke:
+
+```text
+Experiment: smoke_v5_wn18rr_v1_relation_loss_w2
+Config: WN18RR_v1, 1 epoch, batch_size=4, causal_loss=0.5, effect_loss=0.0, original score, selection_metric=auc_pr, relation_loss_weight_path=configs/wn18rr_v1_weak_relation_loss_weight2.json.
+Best validation AUC/AUC-PR: 0.9155/0.9327.
+No test run.
+At the second validation point _hypernym AUC-PR=0.8633 and _has_part AUC-PR=0.9218, but aggregate stayed below same-env WN18RR_v1 baseline AUC-PR 0.9350.
+Epoch1 relation_loss_weight_mean=1.3398 and masks were globally healthy: raw=0.4358/0.4325, entropy=0.5986/0.6831.
+```
+
+Validation diagnostic:
+
+```text
+Experiment: diag_v5_wn18rr_v1_relation_loss_w2_original_w05_8ep
+Config: WN18RR_v1, 8 epochs, batch_size=16, causal_loss=0.5, effect_loss=0.0, original score, selection_metric=auc_pr, all-mode/relation score/mask logging, relation loss weights 2x for _hypernym/_has_part.
+Best validation original AUC/AUC-PR: 0.9153/0.9194.
+No test run.
+```
+
+Conclusion:
+
+```text
+Negative validation result. The weak-relation improvement from smoke did not reproduce at standard batch_size=16. Best-point _hypernym AUC-PR was only 0.7048 and _has_part AUC-PR 0.6700; later validation dropped to AUC/AUC-PR 0.8345/0.8861. Relation masks were unstable: early _hypernym causal_raw=0.8571 with overlap=0.3406; later _has_part causal_raw=0.0467 with entropy=0.1401. Do not test. Simple weak-relation upweighting is not a WN fix.
+```
