@@ -71,10 +71,23 @@ Effect loss is not part of the current mainline. Multiple diagnostics showed tha
 
 ## Formal Positive Results
 
+2026-06-08 audit update: the previously reported `nell_v1` and `fb237_v1`
+formal positives were run on `nell_v1` / `fb237_v1` test directories, not on
+the required inductive `nell_v1_ind` / `fb237_v1_ind` test directories. They are
+invalid for final inductive comparison. Correct `_ind` retests are recorded in
+`RESULTS_LEDGER.md` and are not confirmed positives.
+
 | Dataset | Experiment | AUC | AUC-PR | MRR | Hits@1 | Hits@5 | Hits@10 | Conclusion |
 |---|---|---:|---:|---:|---:|---:|---:|---|
-| `nell_v1` | `diag_v5_nell_v1_original_score_w05_allmodes_10ep` | 0.8943 | 0.9230 | 0.7247 | 0.6469 | 0.8212 | 0.8531 | Beats same-env baseline and paper AUC-PR/Hits@10 |
-| `fb237_v1` | `diag_v5_fb237_v1_original_score_w05_allmodes_10ep_lc` | 0.8396 | 0.8546 | 0.5575 | 0.4492 | 0.6829 | 0.7622 | Beats same-env baseline and paper AUC-PR/Hits@10 |
+| `nell_v1` | `diag_v5_nell_v1_original_score_w05_allmodes_10ep` | 0.8943 | 0.9230 | 0.7247 | 0.6469 | 0.8212 | 0.8531 | INVALID: non-inductive test on `nell_v1`, not `nell_v1_ind` |
+| `fb237_v1` | `diag_v5_fb237_v1_original_score_w05_allmodes_10ep_lc` | 0.8396 | 0.8546 | 0.5575 | 0.4492 | 0.6829 | 0.7622 | INVALID: non-inductive test on `fb237_v1`, not `fb237_v1_ind` |
+
+Correct inductive retests:
+
+| Dataset | Experiment | AUC | AUC-PR | MRR | Hits@1 | Hits@5 | Hits@10 | Conclusion |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| `nell_v1_ind` | `audit_inductive_retest_nell_v1` | 0.8739 | 0.8073 | 0.5080 | 0.4650 | 0.5350 | 0.5800 | Not a confirmed positive; `_ind` same-env baseline artifact not confirmed |
+| `fb237_v1_ind` | `audit_inductive_retest_fb237_v1` | 0.7494 | 0.7975 | 0.4684 | 0.3927 | 0.5634 | 0.6049 | Not a confirmed positive; `_ind` same-env baseline artifact not confirmed |
 
 Same-environment baselines:
 
@@ -189,7 +202,7 @@ Current completed formal-positive count from the ledger:
 Current score:
 
 ```text
-2 / 12 formal-positive tasks.
+0 / 12 confirmed formal-positive inductive tasks after the 2026-06-08 `_ind` audit.
 Need at least 10 / 12.
 ```
 
